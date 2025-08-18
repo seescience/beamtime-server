@@ -45,4 +45,4 @@ Desktop.ini
 .pytest_cache/
 
 # Sensitive data
-.env
+*.env
