@@ -13,7 +13,7 @@
 
 [project]
 name = "beamtime-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "Backend server for the beamtime application. It is used to create experiment folders, DOIs and cloud links (Globus/Nextcloud) for experiment data."
 readme = "README.md"
 authors = [
@@ -23,14 +23,18 @@ maintainers = [
     { name = "Christofanis Skordas", email = "55315750+skordaschristofanis@users.noreply.github.com" }
 ]
 requires-python = "==3.13.*"
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.1.1",
+    "requests>=2.32.4",
+    "pydantic>=2.5.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/seescience/beamtime-server"
 
 [build-system]
-requires = ["uv_build>=0.8.0,<0.9"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
@@ -85,9 +89,4 @@ python_classes = [
 ]
 python_functions = [
     "test_*",
-]
-
-[tool.uv.workspace]
-members = [
-    "temp",
 ]
