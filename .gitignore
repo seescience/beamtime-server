@@ -12,9 +12,6 @@
 # Copyright (c) 2025 GSECARS, The University of Chicago, USA
 # ----------------------------------------------------------------------------------
 
-3.13
-
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -46,3 +43,7 @@ Desktop.ini
 
 # Sensitive data
 *.env
+
+# Logs
+logs/
+test_logs/
