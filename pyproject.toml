@@ -26,7 +26,8 @@ requires-python = "==3.13.*"
 dependencies = [
     "python-dotenv>=1.1.1",
     "requests>=2.32.4",
-    "pydantic>=2.5.0",
+    "sqlalchemy>=2.0.43",
+    "psycopg2-binary>=2.9.10",
 ]
 
 [project.urls]

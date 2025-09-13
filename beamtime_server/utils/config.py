@@ -3,9 +3,7 @@
 # File: beamtime_server/utils/config.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# This module provides centralized configuration management for the beamtime server.
-# It loads environment variables from .env files and makes them available to other
-# modules using Pydantic for validation.
+# This module defines configuration classes for the Beamtime Server application.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -14,75 +12,114 @@
 # ----------------------------------------------------------------------------------
 
 import os
-from pathlib import Path
-from typing import Any
+from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, HttpUrl, SecretStr, field_validator, model_validator
 
-__all__ = ["DOIConfig"]
-
-
-# Set the configuration path relative to this file's location
-CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config"
+# Load environment variables from .env file
+load_dotenv()
 
 
-class DOIConfig(BaseModel):
-    """Configuration class for the Beamtime Server DOI service."""
+class BaseConfig:
+    """Simple application configuration class - only essential variables."""
 
-    base_url: HttpUrl = Field(..., description="The base URL for the DOI service", alias="DOI_BASE_URL")
-    username: str = Field(..., description="The username for authenticating with the DOI service.", alias="DOI_USERNAME")
-    password: SecretStr = Field(..., description="The password for authenticating with the DOI service.", alias="DOI_PASSWORD")
-    prefix: str = Field(..., description="The assigned DOI prefix (e.g., '10.12345').", alias="DOI_PREFIX")
+    # Database configuration
+    DATABASE_URI = os.getenv("DATABASE_URI")
+    DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE"))
+    DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW"))
+    DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT"))
+    DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE"))
+    DB_ECHO = os.getenv("DB_ECHO").lower() == "true"
 
-    @field_validator("prefix")
-    @classmethod
-    def validate_prefix(cls, prefix: str) -> str:
-        """Validate that the DOI prefix is in the correct format (e.g., '10.XXXX')."""
-        if not prefix.startswith("10."):
-            raise ValueError("DOI prefix must start with '10.'")
-        # Check if there's content after "10."
-        prefix_parts = prefix.split(".", 1)
-        if len(prefix_parts) < 2 or not prefix_parts[1].strip():
-            raise ValueError("DOI prefix must have format '10.XXXXX' with a valid suffix")
-        return prefix
+    # DOI service configuration
+    DOI_BASE_URL = os.getenv("DOI_BASE_URL")
+    DOI_USERNAME = os.getenv("DOI_USERNAME")
+    DOI_PASSWORD = os.getenv("DOI_PASSWORD")
+    DOI_PREFIX = os.getenv("DOI_PREFIX")
 
-    @field_validator("username")
-    @classmethod
-    def validate_username(cls, username: str) -> str:
-        """Validate that the username is not empty or just whitespace."""
-        if not username.strip():
-            raise ValueError("Username cannot be empty")
-        return username.strip()
+    # Logging configuration
+    LOG_FILE = os.getenv("LOG_FILE")
 
-    @field_validator("password")
-    @classmethod
-    def validate_password(cls, password: SecretStr) -> SecretStr:
-        """Validate that the password is not empty or just whitespace."""
-        password_value = password.get_secret_value()
-        if not password_value.strip():
-            raise ValueError("Password cannot be empty")
-        return password
 
-    @model_validator(mode="before")
-    @classmethod
-    def load_environment(cls, data: Any) -> dict[str, Any]:
-        """Load environment variables from doi.env file before validation."""
-        # Load the doi.env file from the project config directory
-        doi_env_file = CONFIG_PATH / "doi.env"
-        if not doi_env_file.is_file():
-            raise FileNotFoundError(f"Configuration file not found: {doi_env_file}")
+@dataclass(frozen=True)
+class DatabaseConfig:
+    """Database configuration."""
 
-        # Load environment variables from the .env file
-        load_dotenv(dotenv_path=doi_env_file)
+    _database_uri: str = field(init=False, compare=False, repr=False, default=BaseConfig.DATABASE_URI)
+    _pool_size: int = field(init=False, compare=False, repr=False, default=BaseConfig.DB_POOL_SIZE)
+    _max_overflow: int = field(init=False, compare=False, repr=False, default=BaseConfig.DB_MAX_OVERFLOW)
+    _pool_timeout: int = field(init=False, compare=False, repr=False, default=BaseConfig.DB_POOL_TIMEOUT)
+    _pool_recycle: int = field(init=False, compare=False, repr=False, default=BaseConfig.DB_POOL_RECYCLE)
+    _echo: bool = field(init=False, compare=False, repr=False, default=BaseConfig.DB_ECHO)
 
-        # Return environment variables for Pydantic to process
-        return {
-            "DOI_BASE_URL": os.getenv("DOI_BASE_URL"),
-            "DOI_USERNAME": os.getenv("DOI_USERNAME"),
-            "DOI_PASSWORD": os.getenv("DOI_PASSWORD"),
-            "DOI_PREFIX": os.getenv("DOI_PREFIX"),
-        }
+    @property
+    def database_uri(self) -> str:
+        """Get the database URI."""
+        return self._database_uri
 
-    # Ensure immutability of the configuration
-    model_config = {"str_strip_whitespace": True, "validate_assignment": True, "frozen": True}
+    @property
+    def pool_size(self) -> int:
+        """Get the database pool size."""
+        return self._pool_size
+
+    @property
+    def max_overflow(self) -> int:
+        """Get the database max overflow."""
+        return self._max_overflow
+
+    @property
+    def pool_timeout(self) -> int:
+        """Get the database pool timeout."""
+        return self._pool_timeout
+
+    @property
+    def pool_recycle(self) -> int:
+        """Get the database pool recycle time."""
+        return self._pool_recycle
+
+    @property
+    def echo(self) -> bool:
+        """Get the database echo setting."""
+        return self._echo
+
+
+@dataclass(frozen=True)
+class DOIConfig:
+    """DOI service configuration."""
+
+    _base_url: str = field(init=False, compare=False, repr=False, default=BaseConfig.DOI_BASE_URL)
+    _username: str = field(init=False, compare=False, repr=False, default=BaseConfig.DOI_USERNAME)
+    _password: str = field(init=False, compare=False, repr=False, default=BaseConfig.DOI_PASSWORD)
+    _prefix: str = field(init=False, compare=False, repr=False, default=BaseConfig.DOI_PREFIX)
+
+    @property
+    def base_url(self) -> str:
+        """Get the DOI service base URL."""
+        return self._base_url
+
+    @property
+    def username(self) -> str:
+        """Get the DOI service username."""
+        return self._username
+
+    @property
+    def password(self) -> str:
+        """Get the DOI service password."""
+        return self._password
+
+    @property
+    def prefix(self) -> str:
+        """Get the DOI prefix."""
+        return self._prefix
+
+
+@dataclass(frozen=True)
+class LoggingConfig:
+    """Logging configuration."""
+
+    _log_file: str = field(init=False, compare=False, repr=False, default=BaseConfig.LOG_FILE)
+
+    @property
+    def log_file(self) -> str:
+        """Get the log file path."""
+        return self._log_file

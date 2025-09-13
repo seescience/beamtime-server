@@ -3,7 +3,7 @@
 # File: beamtime_server/utils/logger.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Simple centralized logging with rotating compressed log files.
+# Centralized logging with rotating compressed log files.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -17,6 +17,8 @@ import logging.handlers
 import shutil
 from pathlib import Path
 from typing import Optional
+
+from beamtime_server.utils.config import LoggingConfig
 
 
 class CompressedRotatingFileHandler(logging.handlers.RotatingFileHandler):
@@ -58,33 +60,50 @@ class CompressedRotatingFileHandler(logging.handlers.RotatingFileHandler):
 
 
 class AppLogger:
-    """Simple centralized logger for the beamtime server application."""
+    """Centralized logger."""
 
-    _initialized: bool = False
+    _instance: Optional["AppLogger"] = None
+    _logger: Optional[logging.Logger] = None
 
-    @classmethod
-    def initialize(cls, log_directory: Optional[str | Path]) -> None:
+    def __new__(cls) -> "AppLogger":
+        """Singleton pattern - ensure only one logger instance."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialize()
+        return cls._instance
+
+    def _initialize(self) -> None:
         """Initialize the logging configuration."""
-
-        if cls._initialized:
+        if self._logger is not None:
             return
 
-        # Set defaults with proper type handling
-        effective_log_level = "INFO"
-        effective_log_directory = Path(log_directory)
+        # Use LoggingConfig to get log path, with fallback to default
+        try:
+            logging_config = LoggingConfig()
+            if logging_config.log_file:
+                log_file_path = Path(logging_config.log_file)
+                log_directory = log_file_path.parent
+                # Use the full log file path from config
+                full_log_path = log_file_path
+            else:
+                log_directory = Path("./logs")
+                full_log_path = log_directory / "beamtime_server.log"
+        except Exception:
+            log_directory = Path("./logs")
+            full_log_path = log_directory / "beamtime_server.log"
 
         # Ensure log directory exists
-        effective_log_directory.mkdir(parents=True, exist_ok=True)
+        log_directory.mkdir(parents=True, exist_ok=True)
 
-        # Create log file path
-        log_file_path = effective_log_directory / "beamtime_server.log"
+        # Set defaults
+        effective_log_level = "INFO"
 
         # Create detailed formatter for file logs
         detailed_formatter = logging.Formatter("%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         # Create rotating file handler (10MB, keep 10 backups)
         rotating_file_handler = CompressedRotatingFileHandler(
-            str(log_file_path),
+            str(full_log_path),
             maxBytes=10 * 1024 * 1024,  # 10MB
             backupCount=10,
         )
@@ -92,43 +111,32 @@ class AppLogger:
         rotating_file_handler.setLevel(effective_log_level)
 
         # Create root logger for the application
-        cls._logger = logging.getLogger("beamtime_server")
-        cls._logger.setLevel(effective_log_level)
-        cls._logger.addHandler(rotating_file_handler)
+        self._logger = logging.getLogger("beamtime_server")
+        self._logger.setLevel(effective_log_level)
+        self._logger.addHandler(rotating_file_handler)
 
         # Prevent duplicate logs
-        cls._logger.propagate = False
+        self._logger.propagate = False
 
-        cls._initialized = True
-        cls._logger.info(f"Logging initialized with level: {effective_log_level}")
-        cls._logger.info(f"Log file: {log_file_path}")
+        self._logger.info(f"Logging initialized with level: {effective_log_level}")
+        self._logger.info(f"Log file: {full_log_path}")
 
-    @classmethod
-    def get_logger(cls) -> logging.Logger:
-        """Return the application logger, initializing if necessary."""
-
-        if not cls._initialized:
-            cls.initialize()
-        return cls._logger
+    def get_logger(self) -> logging.Logger:
+        """Return the application logger."""
+        return self._logger
 
     @classmethod
     def reset(cls) -> None:
         """Reset the logger (mainly for testing purposes)."""
-
-        if cls._logger:
+        if cls._instance and cls._instance._logger:
             # Remove all handlers and close them properly
-            for handler in cls._logger.handlers[:]:
-                cls._logger.removeHandler(handler)
+            for handler in cls._instance._logger.handlers[:]:
+                cls._instance._logger.removeHandler(handler)
                 handler.close()
-        cls._initialized = False
-        cls._logger = None
+        cls._instance = None
 
 
 def get_logger() -> logging.Logger:
     """Get the application logger."""
-    return AppLogger.get_logger()
-
-
-def initialize_logging(log_dir: Optional[str | Path] = "./logs") -> None:
-    """Initialize the logging configuration."""
-    AppLogger.initialize(log_directory=log_dir)
+    app_logger = AppLogger()
+    return app_logger.get_logger()

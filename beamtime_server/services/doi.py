@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 import requests
 
-from beamtime_server.utils import DOIConfig
+from beamtime_server.utils import DOIConfig, get_logger
 
 
 @dataclass
@@ -113,34 +113,34 @@ class DOIError(Exception):
 class DOIService:
     """A class for creating, updating, publishing and deleting DOIs using DataCite API."""
 
-    config: DOIConfig
-    logger: Logger
-    session: Optional[requests.Session] = field(default=None)
+    _session: requests.Session | None = field(default=None)
+    _config: DOIConfig = field(init=False, compare=False, repr=False, default=DOIConfig())
+    _logger: Logger = field(init=False, compare=False, repr=False, default=get_logger())
 
     def __post_init__(self) -> None:
         """Post-initialization to validate all required environment variables and set up session."""
         # Set up session if not provided
-        if self.session is None:
-            self.session = requests.Session()
+        if self._session is None:
+            self._session = requests.Session()
 
     def create_draft_doi(self, metadata: DOISchema) -> dict:
         """Create a draft DOI with the provided metadata."""
         try:
-            url = f"{self.config.base_url}/dois"
-            auth = (self.config.username, self.config.password.get_secret_value())
+            url = f"{self._config.base_url}/dois"
+            auth = (self._config.username, self._config.password)
             headers = {"Content-Type": "application/vnd.api+json"}
-            payload = metadata.to_datacite_payload(prefix=self.config.prefix)
+            payload = metadata.to_datacite_payload(prefix=self._config.prefix)
 
-            self.logger.info(f"Creating draft DOI {payload['data']['attributes'].get('doi')}")
-            response = self.session.post(url, json=payload, headers=headers, auth=auth)
+            self._logger.info(f"Creating draft DOI {payload['data']['attributes'].get('doi')}")
+            response = self._session.post(url, json=payload, headers=headers, auth=auth)
 
             if response.status_code == 201:
                 doi_data = response.json()
-                self.logger.info(f"Successfully created draft DOI: {doi_data['data']['id']}")
+                self._logger.info(f"Successfully created draft DOI: {doi_data['data']['id']}")
                 return doi_data
             else:
                 error_message = f"Failed to create draft DOI: HTTP {response.status_code} - {response.text}"
-                self.logger.error(error_message)
+                self._logger.error(error_message)
                 raise DOIError(error_message)
 
         except DOIError:
@@ -148,31 +148,31 @@ class DOIService:
             raise
         except (requests.exceptions.RequestException, ConnectionError) as e:
             message = f"Network error while creating draft DOI: {e}"
-            self.logger.error(message)
+            self._logger.error(message)
             raise DOIError(message) from e
         except Exception as e:
             message = f"Unexpected error while creating draft DOI: {e}"
-            self.logger.error(message)
+            self._logger.error(message)
             raise DOIError(message) from e
 
     def update_doi(self, doi_id: str, metadata: DOISchema) -> dict:
         """Update an existing DOI with new metadata."""
         try:
-            url = f"{self.config.base_url}/dois/{doi_id}"
-            auth = (self.config.username, self.config.password.get_secret_value())
+            url = f"{self._config.base_url}/dois/{doi_id}"
+            auth = (self._config.username, self._config.password)
             headers = {"Content-Type": "application/vnd.api+json"}
-            payload = metadata.to_datacite_payload(prefix=self.config.prefix, doi_id=doi_id)
+            payload = metadata.to_datacite_payload(prefix=self._config.prefix, doi_id=doi_id)
 
-            self.logger.info(f"Updating DOI: {doi_id}")
-            response = self.session.put(url, json=payload, headers=headers, auth=auth)
+            self._logger.info(f"Updating DOI: {doi_id}")
+            response = self._session.put(url, json=payload, headers=headers, auth=auth)
 
             if response.status_code == 200:
                 doi_data = response.json()
-                self.logger.info(f"Successfully updated DOI: {doi_data['data']['id']}")
+                self._logger.info(f"Successfully updated DOI: {doi_data['data']['id']}")
                 return doi_data
             else:
                 error_message = f"Failed to update DOI: HTTP {response.status_code} - {response.text}"
-                self.logger.error(error_message)
+                self._logger.error(error_message)
                 raise DOIError(error_message)
 
         except DOIError:
@@ -180,29 +180,29 @@ class DOIService:
             raise
         except (requests.exceptions.RequestException, ConnectionError) as e:
             message = f"Network error while updating DOI: {e}"
-            self.logger.error(message)
+            self._logger.error(message)
             raise DOIError(message) from e
         except Exception as e:
             message = f"Unexpected error while updating DOI: {e}"
-            self.logger.error(message)
+            self._logger.error(message)
             raise DOIError(message) from e
 
     def delete_doi(self, doi_id: str) -> bool:
         """Delete a draft DOI."""
         try:
-            url = f"{self.config.base_url}/dois/{doi_id}"
-            auth = (self.config.username, self.config.password.get_secret_value())
+            url = f"{self._config.base_url}/dois/{doi_id}"
+            auth = (self._config.username, self._config.password)
             headers = {"Content-Type": "application/vnd.api+json"}
 
-            self.logger.info(f"Deleting DOI: {doi_id}")
-            response = self.session.delete(url, headers=headers, auth=auth)
+            self._logger.info(f"Deleting DOI: {doi_id}")
+            response = self._session.delete(url, headers=headers, auth=auth)
 
             if response.status_code == 204:
-                self.logger.info(f"Successfully deleted DOI: {doi_id}")
+                self._logger.info(f"Successfully deleted DOI: {doi_id}")
                 return True
             else:
                 error_message = f"Failed to delete DOI: HTTP {response.status_code} - {response.text}"
-                self.logger.error(error_message)
+                self._logger.error(error_message)
                 raise DOIError(error_message)
 
         except DOIError:
@@ -210,9 +210,9 @@ class DOIService:
             raise
         except (requests.exceptions.RequestException, ConnectionError) as e:
             message = f"Network error while deleting DOI: {e}"
-            self.logger.error(message)
+            self._logger.error(message)
             raise DOIError(message) from e
         except Exception as e:
             message = f"Unexpected error while deleting DOI: {e}"
-            self.logger.error(message)
+            self._logger.error(message)
             raise DOIError(message) from e

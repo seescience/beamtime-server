@@ -29,6 +29,6 @@ To run specific test files:
 pytest tests/test_doi.py
 ```
 
-## General Test Information
+## Test Requirements
 
-The test suite provides general coverage of the Beamtime-Server modules. Tests validate the core functionality of the modules.
+- **DOI tests** require a valid `.env` file with DataCite API credentials
