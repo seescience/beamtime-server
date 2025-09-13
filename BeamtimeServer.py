@@ -13,8 +13,7 @@
 
 from argparse import ArgumentParser
 
-from beamtime_server.queue_processor import QueueProcessor
-from beamtime_server.utils import DatabaseManager, get_logger
+from beamtime_server import DatabaseManager, QueueProcessor, get_logger
 from tests import run_all_tests
 
 
