@@ -97,10 +97,12 @@ class QueueProcessor:
                 # Generate DOI with correct format: {prefix}/data_{experiment_id}
                 doi_config = DOIConfig()
                 doi_id = f"{doi_config.prefix}/data_{queue_item.experiment_id}"
+                doi_link = f"https://doi.org/{doi_id}"
 
                 self._logger.info(
                     f"[DRY-RUN] DOI metadata prepared - DOI: {doi_id}, Title: {title}, Year: {pub_year}, Creators: {len(creators) if creators else 0}"
                 )
+                self._logger.info(f"[DRY-RUN] Would update experiment {queue_item.experiment_id} with DOI link: {doi_link}")
                 self._logger.info(f"[DRY-RUN] DOI creation simulated successfully for queue item {queue_item.id}")
                 return
 
@@ -131,7 +133,10 @@ class QueueProcessor:
             doi_id = result.get("data", {}).get("id")
 
             if doi_id:
-                self._logger.info(f"Successfully created DOI {doi_id} for queue item {queue_item.id}")
+                # Update experiment with DOI link
+                doi_link = f"https://doi.org/{doi_id}"
+                crud.update_experiment_doi_link(self._db_manager, queue_item.experiment_id, doi_link)
+                self._logger.info(f"Successfully created DOI {doi_id} and updated experiment {queue_item.experiment_id} with link: {doi_link}")
             else:
                 raise Exception("DOI creation returned no ID")
 

@@ -18,7 +18,7 @@ from sqlalchemy import delete, select, update
 from beamtime_server.models import ExperimentItem, Person, ProcessStatusEnum, QueueItem
 from beamtime_server.utils.database import DBException
 
-__all__ = ["get_next_queue_item", "update_experiment_status", "delete_queue_item", "get_experiment_title"]
+__all__ = ["get_next_queue_item", "update_experiment_status", "delete_queue_item", "get_experiment_title", "update_experiment_doi_link"]
 
 
 def get_next_queue_item(db_manager) -> Optional[dict]:
@@ -129,3 +129,13 @@ def get_publication_year_for_experiment(db_manager, experiment_id: int) -> Optio
 
         except Exception as e:
             raise DBException(f"Error getting publication year for experiment {experiment_id}: {e}")
+
+
+def update_experiment_doi_link(db_manager, experiment_id: int, doi_link: str) -> bool:
+    """Update experiment sees_doi field with the DOI link."""
+    with db_manager.get_session() as session:
+        try:
+            result = session.execute(update(ExperimentItem).where(ExperimentItem.id == experiment_id).values(sees_doi=doi_link))
+            return result.rowcount > 0
+        except Exception as e:
+            raise DBException(f"Error updating experiment {experiment_id} DOI link: {e}")
