@@ -124,6 +124,15 @@ class QueueProcessor:
                 publisher="The University of Chicago",
                 publication_year=pub_year,
                 types={"resourceType": "Dataset", "resourceTypeGeneral": "Dataset"},
+                rights_list=[
+                    {
+                        "rights": "Creative Commons Attribution 4.0 International",
+                        "rightsUri": "https://creativecommons.org/licenses/by/4.0/legalcode",
+                        "rightsIdentifier": "CC-BY-4.0",
+                        "rightsIdentifierScheme": "SPDX",
+                        "schemeUri": "https://spdx.org/licenses/",
+                    }
+                ],
                 event="draft",
                 doi=doi_id,
             )
