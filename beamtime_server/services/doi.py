@@ -58,6 +58,7 @@ class DOISchema:
         attributes = {
             "event": self.event,
             "prefix": prefix,
+            "schemaVersion": "http://datacite.org/schema/kernel-4",
             "creators": self.creators,
             "titles": self.titles,
             "publisher": self.publisher,
