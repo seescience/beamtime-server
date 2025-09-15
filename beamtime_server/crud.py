@@ -18,7 +18,14 @@ from sqlalchemy import delete, select, update
 from beamtime_server.models import ExperimentItem, Person, ProcessStatusEnum, QueueItem
 from beamtime_server.utils.database import DBException
 
-__all__ = ["get_next_queue_item", "update_experiment_status", "delete_queue_item", "get_experiment_title", "update_experiment_doi_link"]
+__all__ = [
+    "get_next_queue_item",
+    "update_experiment_status",
+    "delete_queue_item",
+    "get_experiment_title",
+    "update_experiment_doi_link",
+    "get_experiment_start_date",
+]
 
 
 def get_next_queue_item(db_manager) -> Optional[dict]:
@@ -139,3 +146,17 @@ def update_experiment_doi_link(db_manager, experiment_id: int, doi_link: str) ->
             return result.rowcount > 0
         except Exception as e:
             raise DBException(f"Error updating experiment {experiment_id} DOI link: {e}")
+
+
+def get_experiment_start_date(db_manager, experiment_id: int) -> Optional[str]:
+    """Get experiment start year for DOI metadata."""
+    with db_manager.get_session() as session:
+        try:
+            experiment = session.execute(select(ExperimentItem).where(ExperimentItem.id == experiment_id)).scalar_one_or_none()
+
+            if experiment and experiment.start_date:
+                return str(experiment.start_date.year)
+            return None
+
+        except Exception as e:
+            raise DBException(f"Error getting start date for experiment {experiment_id}: {e}")

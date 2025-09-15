@@ -98,12 +98,14 @@ class QueueProcessor:
                 doi_config = DOIConfig()
                 doi_id = f"{doi_config.prefix}/data_{queue_item.experiment_id}"
                 doi_link = f"https://doi.org/{doi_id}"
+                public_data_url = f"https://public.seescience.org/data/{pub_year}/{queue_item.experiment_id}"
 
                 self._logger.info(
                     f"[DRY-RUN] DOI metadata prepared - DOI: {doi_id}, Title: {title}, Year: {pub_year}, Creators: {len(creators) if creators else 0}"
                 )
+                self._logger.info("[DRY-RUN] DOI includes CC-BY-4.0 license: https://creativecommons.org/licenses/by/4.0/legalcode")
+                self._logger.info(f"[DRY-RUN] DOI points to public data URL: {public_data_url}")
                 self._logger.info(f"[DRY-RUN] Would update experiment {queue_item.experiment_id} with DOI link: {doi_link}")
-                self._logger.info(f"[DRY-RUN] DOI creation simulated successfully for queue item {queue_item.id}")
                 return
 
             self._logger.info(f"Creating DOI for queue item {queue_item.id}")
@@ -112,10 +114,14 @@ class QueueProcessor:
             creators = crud.build_creators_from_spokesperson(self._db_manager, queue_item.experiment_id)
             pub_year = crud.get_publication_year_for_experiment(self._db_manager, queue_item.experiment_id)
             title = crud.get_experiment_title(self._db_manager, queue_item.experiment_id)
+            start_date = crud.get_experiment_start_date(self._db_manager, queue_item.experiment_id)
 
             # Generate DOI with correct format: {prefix}/data_{experiment_id}
             doi_config = DOIConfig()
             doi_id = f"{doi_config.prefix}/data_{queue_item.experiment_id}"
+
+            # Build public data URL
+            public_data_url = f"https://public.seescience.org/data/{pub_year}/{queue_item.experiment_id}"
 
             # Build DOI metadata
             doi_metadata = DOISchema(
@@ -124,6 +130,9 @@ class QueueProcessor:
                 publisher="The University of Chicago",
                 publication_year=pub_year,
                 types={"resourceType": "Dataset", "resourceTypeGeneral": "Dataset"},
+                language="en",
+                version="0.1",
+                dates=[{"date": start_date, "dateType": "Issued"}],
                 rights_list=[
                     {
                         "rights": "Creative Commons Attribution 4.0 International",
@@ -133,6 +142,7 @@ class QueueProcessor:
                         "schemeUri": "https://spdx.org/licenses/",
                     }
                 ],
+                url=public_data_url,
                 event="draft",
                 doi=doi_id,
             )
@@ -145,7 +155,8 @@ class QueueProcessor:
                 # Update experiment with DOI link
                 doi_link = f"https://doi.org/{doi_id}"
                 crud.update_experiment_doi_link(self._db_manager, queue_item.experiment_id, doi_link)
-                self._logger.info(f"Successfully created DOI {doi_id} and updated experiment {queue_item.experiment_id} with link: {doi_link}")
+                self._logger.info(f"Successfully created DOI {doi_id} pointing to {public_data_url}")
+                self._logger.info(f"Updated experiment {queue_item.experiment_id} with DOI link: {doi_link}")
             else:
                 raise Exception("DOI creation returned no ID")
 
