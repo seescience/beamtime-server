@@ -217,3 +217,69 @@ class DOIService:
             message = f"Unexpected error while deleting DOI: {e}"
             self._logger.error(message)
             raise DOIError(message) from e
+
+    def publish_doi(self, doi_id: str) -> dict:
+        """Publish a DOI to make it findable (changes state from draft to findable).    DOIError: If the operation fails"""
+        try:
+            url = f"{self._config.base_url}/dois/{doi_id}"
+            auth = (self._config.username, self._config.password)
+            headers = {"Content-Type": "application/vnd.api+json"}
+
+            # Create minimal payload with just the event change
+            payload = {"data": {"type": "dois", "id": doi_id, "attributes": {"event": "publish"}}}
+
+            self._logger.info(f"Publishing DOI to make it findable: {doi_id}")
+            response = self._session.put(url, json=payload, headers=headers, auth=auth)
+
+            if response.status_code == 200:
+                doi_data = response.json()
+                self._logger.info(f"Successfully published DOI: {doi_data['data']['id']} - now findable")
+                return doi_data
+            else:
+                error_message = f"Failed to publish DOI: HTTP {response.status_code} - {response.text}"
+                self._logger.error(error_message)
+                raise DOIError(error_message)
+
+        except DOIError:
+            # Re-raise DOIError as-is
+            raise
+        except (requests.exceptions.RequestException, ConnectionError) as e:
+            message = f"Network error while publishing DOI: {e}"
+            self._logger.error(message)
+            raise DOIError(message) from e
+        except Exception as e:
+            message = f"Unexpected error while publishing DOI: {e}"
+            self._logger.error(message)
+            raise DOIError(message) from e
+
+    def get_doi_status(self, doi_id: str) -> dict:
+        """Get the current status/state of a DOI."""
+        try:
+            url = f"{self._config.base_url}/dois/{doi_id}"
+            auth = (self._config.username, self._config.password)
+            headers = {"Content-Type": "application/vnd.api+json"}
+
+            self._logger.debug(f"Checking status of DOI: {doi_id}")
+            response = self._session.get(url, headers=headers, auth=auth)
+
+            if response.status_code == 200:
+                doi_data = response.json()
+                state = doi_data.get("data", {}).get("attributes", {}).get("state", "unknown")
+                self._logger.debug(f"DOI {doi_id} current state: {state}")
+                return doi_data
+            else:
+                error_message = f"Failed to get DOI status: HTTP {response.status_code} - {response.text}"
+                self._logger.error(error_message)
+                raise DOIError(error_message)
+
+        except DOIError:
+            # Re-raise DOIError as-is
+            raise
+        except (requests.exceptions.RequestException, ConnectionError) as e:
+            message = f"Network error while getting DOI status: {e}"
+            self._logger.error(message)
+            raise DOIError(message) from e
+        except Exception as e:
+            message = f"Unexpected error while getting DOI status: {e}"
+            self._logger.error(message)
+            raise DOIError(message) from e

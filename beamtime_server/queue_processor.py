@@ -165,9 +165,14 @@ class QueueProcessor:
                 doi_link = f"https://doi.org/{doi_id}"
                 public_data_url = f"https://public.seescience.org/data/{pub_year}/{queue_item.experiment_id}"
 
+                # Determine DOI type based on draft_doi flag
+                draft_mode = hasattr(queue_item, "draft_doi") and queue_item.draft_doi
+                doi_type = "draft" if draft_mode else "findable (published)"
+
                 self._logger.info(
                     f"[DRY-RUN] DOI metadata prepared - DOI: {doi_id}, Title: {title}, Year: {pub_year}, Creators: {len(creators) if creators else 0}"
                 )
+                self._logger.info(f"[DRY-RUN] DOI would be created as: {doi_type}")
                 self._logger.info("[DRY-RUN] DOI includes CC-BY-4.0 license: https://creativecommons.org/licenses/by/4.0/legalcode")
                 self._logger.info(f"[DRY-RUN] DOI points to public data URL: {public_data_url}")
                 self._logger.info(f"[DRY-RUN] Would update experiment {queue_item.experiment_id} with DOI link: {doi_link}")
@@ -192,6 +197,9 @@ class QueueProcessor:
             # Build public data URL
             public_data_url = f"https://public.seescience.org/data/{pub_year}/{queue_item.experiment_id}"
 
+            # Determine event type based on draft_doi flag
+            event_type = "draft" if hasattr(queue_item, "draft_doi") and queue_item.draft_doi else "publish"
+
             # Build DOI metadata
             doi_metadata = DOISchema(
                 creators=creators,
@@ -212,7 +220,7 @@ class QueueProcessor:
                     }
                 ],
                 url=public_data_url,
-                event="draft",
+                event=event_type,
                 doi=doi_id,
             )
 
@@ -244,7 +252,9 @@ class QueueProcessor:
                     self._logger.warning(f"Failed to create DOI public folder: {folder_error}")
                     # Don't fail the entire process if folder creation fails
 
-                self._logger.info(f"Successfully created DOI {doi_id} pointing to {public_data_url}")
+                # Log based on whether it was created as draft or published
+                doi_status = "draft DOI" if event_type == "draft" else "findable DOI"
+                self._logger.info(f"Successfully created {doi_status} {doi_id} pointing to {public_data_url}")
                 self._logger.info(f"Updated experiment {queue_item.experiment_id} with DOI link: {doi_link}")
             else:
                 raise Exception("DOI creation returned no ID")
@@ -282,3 +292,26 @@ class QueueProcessor:
 
         self._logger.info(f"Batch processing completed: {processed_count} items processed")
         return processed_count
+
+    def publish_draft_doi(self, doi_id: str) -> bool:
+        """Publish an existing draft DOI to make it findable."""
+        if self._dry_run:
+            self._logger.info(f"[DRY-RUN] Would publish draft DOI to make it findable: {doi_id}")
+            return True
+
+        try:
+            if not self._doi_service:
+                self._logger.error("DOI service not available (dry-run mode or initialization error)")
+                return False
+
+            result = self._doi_service.publish_doi(doi_id)
+            if result:
+                self._logger.info(f"Successfully published DOI {doi_id} - now findable")
+                return True
+            else:
+                self._logger.error(f"Failed to publish DOI {doi_id}")
+                return False
+
+        except Exception as e:
+            self._logger.error(f"Error publishing DOI {doi_id}: {e}")
+            return False

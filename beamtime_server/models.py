@@ -54,6 +54,7 @@ class QueueItem(Base):
     experiment_id: Mapped[int] = mapped_column(Integer, nullable=False)
     proposal_id: Mapped[int] = mapped_column(Integer, nullable=False)
     create_doi: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    draft_doi: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     data_path: Mapped[str] = mapped_column(Text, nullable=True)
     pvlog_path: Mapped[str] = mapped_column(Text, nullable=True)
     acknowledgments: Mapped[str] = mapped_column(Text, nullable=True)
