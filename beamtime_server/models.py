@@ -13,8 +13,9 @@
 
 from datetime import datetime
 from enum import IntEnum
+from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import TIMESTAMP, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -85,6 +86,38 @@ class ExperimentItem(Base):
     spokesperson_id: Mapped[int] = mapped_column(Integer, ForeignKey("person.id"), nullable=True)
     beamline_contact_id: Mapped[int] = mapped_column(Integer, ForeignKey("person.id"), nullable=True)
     process_status_id: Mapped[int] = mapped_column(Integer, ForeignKey("process_status.id"), nullable=True)
+
+
+class Acknowledgment(Base):
+    """Model for acknowledgment records."""
+
+    __tablename__ = "acknowledgment"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(Text, nullable=True)
+    text: Mapped[str] = mapped_column(Text, nullable=True)
+
+
+class Info(Base):
+    """Model for system configuration info (key-value pairs)."""
+
+    __tablename__ = "info"
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, nullable=True)
+    modify_time: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, nullable=True)
+    create_time: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, nullable=True)
+    display_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
+class Run(Base):
+    """Model for experiment runs."""
+
+    __tablename__ = "run"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=True)
 
 
 class Person(Base):

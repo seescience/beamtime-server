@@ -36,9 +36,13 @@ class BaseConfig:
     DOI_USERNAME = os.getenv("DOI_USERNAME")
     DOI_PASSWORD = os.getenv("DOI_PASSWORD")
     DOI_PREFIX = os.getenv("DOI_PREFIX")
+    DOI_BASE_PATH = os.getenv("DOI_BASE_PATH")
 
     # Logging configuration
     LOG_FILE = os.getenv("LOG_FILE")
+
+    # Beamtime folder configuration
+    BEAMTIME_FOLDER = os.getenv("BEAMTIME_FOLDER")
 
 
 @dataclass(frozen=True)
@@ -91,6 +95,7 @@ class DOIConfig:
     _username: str = field(init=False, compare=False, repr=False, default=BaseConfig.DOI_USERNAME)
     _password: str = field(init=False, compare=False, repr=False, default=BaseConfig.DOI_PASSWORD)
     _prefix: str = field(init=False, compare=False, repr=False, default=BaseConfig.DOI_PREFIX)
+    _doi_base_path: str = field(init=False, compare=False, repr=False, default=BaseConfig.DOI_BASE_PATH)
 
     @property
     def base_url(self) -> str:
@@ -111,6 +116,30 @@ class DOIConfig:
     def prefix(self) -> str:
         """Get the DOI prefix."""
         return self._prefix
+
+    @property
+    def doi_base_path(self) -> str:
+        """Get the DOI base path."""
+        return self._doi_base_path
+
+
+@dataclass(frozen=True)
+class BeamtimeConfig:
+    """Beamtime folder configuration."""
+
+    _beamtime_folder: str = field(init=False, compare=False, repr=False, default=BaseConfig.BEAMTIME_FOLDER)
+
+    @property
+    def beamtime_folder(self) -> str:
+        """Get the beamtime folder path."""
+        return self._beamtime_folder
+
+    @property
+    def esaf_folder(self) -> str:
+        """Get the ESAF folder path (beamtime_folder/esaf)."""
+        from pathlib import Path
+
+        return str(Path(self._beamtime_folder) / "esaf")
 
 
 @dataclass(frozen=True)

@@ -160,3 +160,60 @@ def get_experiment_start_date(db_manager, experiment_id: int) -> Optional[str]:
 
         except Exception as e:
             raise DBException(f"Error getting start date for experiment {experiment_id}: {e}")
+
+
+def get_acknowledgments_by_ids(db_manager, acknowledgment_ids: str) -> list[dict]:
+    """Get acknowledgment records by comma-separated IDs."""
+    if not acknowledgment_ids or not acknowledgment_ids.strip():
+        return []
+
+    # Parse comma-separated IDs
+    try:
+        ids = [int(id_str.strip()) for id_str in acknowledgment_ids.split(",") if id_str.strip()]
+    except ValueError:
+        raise DBException(f"Invalid acknowledgment IDs format: {acknowledgment_ids}")
+
+    if not ids:
+        return []
+
+    with db_manager.get_session() as session:
+        try:
+            from beamtime_server.models import Acknowledgment
+
+            # Get acknowledgment records
+            result = session.execute(select(Acknowledgment).where(Acknowledgment.id.in_(ids)).order_by(Acknowledgment.id)).scalars().all()
+
+            return [{"id": ack.id, "title": ack.title, "text": ack.text} for ack in result]
+
+        except Exception as e:
+            raise DBException(f"Error getting acknowledgments {acknowledgment_ids}: {e}")
+
+
+def get_esaf_pdf_folder(db_manager) -> Optional[str]:
+    """Get the ESAF PDF folder path from info table."""
+    with db_manager.get_session() as session:
+        try:
+            from beamtime_server.models import Info
+
+            result = session.execute(select(Info).where(Info.key == "esaf_pdf_folder")).scalar_one_or_none()
+
+            return result.value if result else None
+
+        except Exception as e:
+            raise DBException(f"Error getting ESAF PDF folder: {e}")
+
+
+def get_experiment_run_name(db_manager, experiment_id: int) -> Optional[str]:
+    """Get the run name for an experiment."""
+    with db_manager.get_session() as session:
+        try:
+            from beamtime_server.models import ExperimentItem, Run
+
+            result = session.execute(
+                select(Run.name).select_from(ExperimentItem).join(Run, ExperimentItem.run_id == Run.id).where(ExperimentItem.id == experiment_id)
+            ).scalar_one_or_none()
+
+            return result
+
+        except Exception as e:
+            raise DBException(f"Error getting run name for experiment {experiment_id}: {e}")

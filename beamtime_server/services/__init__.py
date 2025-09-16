@@ -12,5 +12,6 @@
 # ----------------------------------------------------------------------------------
 
 from beamtime_server.services.doi import DOISchema, DOIService
+from beamtime_server.services.data_management import DataManagementService, DataManagementError
 
-__all__ = ["DOISchema", "DOIService"]
+__all__ = ["DOISchema", "DOIService", "DataManagementService", "DataManagementError"]
