@@ -44,7 +44,7 @@ class DataManagementService:
     def create_folders_at_path(self, path: str | Path, user_base_path: str, acknowledgments: list[dict] = None, experiment_id: int = None) -> Path:
         """Create folder structure directly at the specified path with default subfolders."""
         try:
-            folder_path = Path(path) / Path(user_base_path)
+            folder_path = Path(user_base_path) / Path(path)
 
             # Create the main folder
             folder_path.mkdir(parents=True, exist_ok=True)
