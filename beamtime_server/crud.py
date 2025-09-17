@@ -11,6 +11,7 @@
 # Copyright (c) 2025 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import delete, select, update
@@ -28,6 +29,7 @@ __all__ = [
     "update_experiment_esaf_file",
     "get_experiment_old_process_status",
     "get_experiment_start_date",
+    "get_base_path",
 ]
 
 
@@ -149,8 +151,11 @@ def update_experiment_doi_link(db_manager, experiment_id: int, doi_link: str) ->
             raise DBException(f"Error updating experiment {experiment_id} DOI link: {e}")
 
 
-def update_experiment_folder(db_manager, experiment_id: int, folder_path: str) -> bool:
+def update_experiment_folder(db_manager, experiment_id: int, folder_path: str, user_base_path: str) -> bool:
     """Update experiment folder field with the created folder path."""
+
+    folder_path = str(Path(folder_path).relative_to(Path(user_base_path)))
+
     with db_manager.get_session() as session:
         try:
             result = session.execute(update(ExperimentItem).where(ExperimentItem.id == experiment_id).values(folder=folder_path))
@@ -248,3 +253,17 @@ def get_experiment_run_name(db_manager, experiment_id: int) -> Optional[str]:
 
         except Exception as e:
             raise DBException(f"Error getting run name for experiment {experiment_id}: {e}")
+
+
+def get_base_path(db_manager) -> Optional[str]:
+    """Get the base path from info table."""
+    with db_manager.get_session() as session:
+        try:
+            from beamtime_server.models import Info
+
+            result = session.execute(select(Info).where(Info.key == "base_path")).scalar_one_or_none()
+
+            return result.value if result else None
+
+        except Exception as e:
+            raise DBException(f"Error getting base path: {e}")

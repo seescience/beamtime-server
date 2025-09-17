@@ -41,10 +41,10 @@ class DataManagementService:
     _doi_config: DOIConfig = field(init=False, compare=False, repr=False, default=DOIConfig())
     _beamtime_config: BeamtimeConfig = field(init=False, compare=False, repr=False, default=BeamtimeConfig())
 
-    def create_folders_at_path(self, path: str | Path, acknowledgments: list[dict] = None, experiment_id: int = None) -> Path:
+    def create_folders_at_path(self, path: str | Path, user_base_path: str, acknowledgments: list[dict] = None, experiment_id: int = None) -> Path:
         """Create folder structure directly at the specified path with default subfolders."""
         try:
-            folder_path = Path(path)
+            folder_path = Path(path) / Path(user_base_path)
 
             # Create the main folder
             folder_path.mkdir(parents=True, exist_ok=True)
@@ -67,6 +67,16 @@ class DataManagementService:
             # Note: ESAF file copying is now handled by the queue processor
 
             self._logger.info(f"Created default subfolders (info, pvlog) in: {folder_path}")
+
+            # Remove base path prefix and return with leading slash
+            if user_base_path:
+                try:
+                    relative_path = folder_path.relative_to(Path(user_base_path))
+                    return Path("/") / relative_path
+                except ValueError:
+                    # Path is not under base path, return full path
+                    return folder_path
+
             return folder_path
 
         except (PermissionError, OSError) as e:
@@ -100,7 +110,7 @@ class DataManagementService:
             except Exception as e:
                 self._logger.warning(f"Failed to create acknowledgment file for ID {ack.get('id')}: {e}")
 
-    def copy_esaf_file(self, experiment_id: int, info_folder: Path) -> Optional[str]:
+    def copy_esaf_file(self, experiment_id: int, info_folder: Path, user_base_path: str) -> Optional[str]:
         """Copy ESAF PDF file to the info folder and beamtime ESAF folder if it exists."""
         try:
             from beamtime_server import crud
@@ -147,8 +157,8 @@ class DataManagementService:
             # Copy to beamtime ESAF folder if configured
             if self._beamtime_config.beamtime_folder:
                 try:
-                    # Create destination: BEAMTIME_FOLDER/esaf/run_name/
-                    beamtime_esaf_path = Path(self._beamtime_config.esaf_folder) / run_name
+                    # Create destination with base path prepended: user_base_path/BEAMTIME_FOLDER/esaf/run_name/
+                    beamtime_esaf_path = Path(user_base_path) / Path(self._beamtime_config.beamtime_folder) / "esaf" / run_name
                     beamtime_esaf_path.mkdir(parents=True, exist_ok=True)
 
                     beamtime_dest_file = beamtime_esaf_path / source_file.name
@@ -168,13 +178,22 @@ class DataManagementService:
             else:
                 self._logger.info("BEAMTIME_FOLDER not configured, skipping beamtime ESAF copy")
 
+            # Remove base path prefix and return with leading slash
+            if user_base_path and beamtime_esaf_file_path:
+                try:
+                    relative_path = Path(beamtime_esaf_file_path).relative_to(Path(user_base_path))
+                    return str(Path("/") / relative_path)
+                except ValueError:
+                    # Path is not under base path, return full path
+                    return beamtime_esaf_file_path
+
             return beamtime_esaf_file_path
 
         except Exception as e:
             self._logger.warning(f"Failed to copy ESAF file for experiment {experiment_id}: {e}")
             return None
 
-    def create_doi_public_folder(self, experiment_id: int, year: int, public_base_path: Optional[Path] = None) -> Path:
+    def create_doi_public_folder(self, experiment_id: int, year: int, user_base_path: str, public_base_path: Optional[Path] = None) -> Path:
         """Create the public DOI folder structure matching the DOI URL path."""
         if public_base_path is None:
             # Use configured DOI base path from .env
@@ -182,7 +201,7 @@ class DataManagementService:
 
         try:
             # Create the public DOI folder structure: {year}/{experiment_id}
-            public_doi_path = public_base_path / str(year) / str(experiment_id)
+            public_doi_path = Path(user_base_path) / public_base_path / str(year) / str(experiment_id)
 
             if not public_doi_path.exists():
                 public_doi_path.mkdir(parents=True, exist_ok=True)
@@ -195,11 +214,11 @@ class DataManagementService:
             self._logger.error(message)
             raise DataManagementError(message, operation="create_doi_public_folder", original_error=e)
 
-    def get_doi_public_path(self, experiment_id: int, year: int, public_base_path: Optional[Path] = None) -> Path:
+    def get_doi_public_path(self, experiment_id: int, year: int, user_base_path: str, public_base_path: Optional[Path] = None) -> Path:
         """Get the path to the DOI public folder."""
         if public_base_path is None:
             # Use configured DOI base path from .env
-            public_base_path = Path(self._doi_config.doi_base_path)
+            public_base_path = Path(user_base_path) / Path(self._doi_config.doi_base_path)
 
         return public_base_path / str(year) / str(experiment_id)
 
@@ -260,6 +279,7 @@ class DataManagementService:
         year: int,
         doi_id: str,
         title: str,
+        user_base_path: str,
         creators: Optional[str] = None,
         version: str = "0.1",
         public_base_path: Optional[Path] = None,
@@ -267,7 +287,7 @@ class DataManagementService:
         """Create index.html file in the DOI public folder."""
         try:
             # Get the DOI public folder path
-            public_folder_path = self.get_doi_public_path(experiment_id, year, public_base_path)
+            public_folder_path = self.get_doi_public_path(experiment_id, year, user_base_path, public_base_path)
 
             # Generate HTML content
             html_content = self.generate_doi_index_html(experiment_id, year, doi_id, title, creators, version)

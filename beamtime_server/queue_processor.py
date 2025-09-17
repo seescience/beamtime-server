@@ -12,6 +12,7 @@
 # ----------------------------------------------------------------------------------
 
 import time
+from pathlib import Path
 
 from beamtime_server import crud
 from beamtime_server.models import ProcessStatusEnum, QueueItem
@@ -170,8 +171,12 @@ class QueueProcessor:
                     acknowledgments = crud.get_acknowledgments_by_ids(self._db_manager, queue_item.acknowledgments)
                     self._logger.info(f"Retrieved {len(acknowledgments)} acknowledgments for experiment {queue_item.experiment_id}")
 
-                # Use the data service to create folders directly at the specified path
-                folder_path = self._data_service.create_folders_at_path(queue_item.data_path, acknowledgments, queue_item.experiment_id)
+                # Prepend base path to data_path if available
+                data_path = queue_item.data_path
+                base_path = crud.get_base_path(self._db_manager)
+
+                # Use the data service to create folders
+                folder_path = self._data_service.create_folders_at_path(data_path, base_path, acknowledgments, queue_item.experiment_id)
                 self._logger.info(f"Successfully created folder structure at: {folder_path}")
 
                 # Update experiment database with the folder path
@@ -184,8 +189,8 @@ class QueueProcessor:
 
                 # Copy ESAF file and save beamtime path to database
                 try:
-                    info_folder = folder_path / "info"
-                    esaf_beamtime_path = self._data_service.copy_esaf_file(queue_item.experiment_id, info_folder)
+                    info_folder = Path(base_path) / folder_path / "info"
+                    esaf_beamtime_path = self._data_service.copy_esaf_file(queue_item.experiment_id, info_folder, base_path)
                     if esaf_beamtime_path:
                         crud.update_experiment_esaf_file(self._db_manager, queue_item.experiment_id, esaf_beamtime_path)
                         self._logger.info(f"Updated experiment {queue_item.experiment_id} with ESAF beamtime path: {esaf_beamtime_path}")
@@ -233,7 +238,7 @@ class QueueProcessor:
                 self._logger.info(f"[DRY-RUN] Would update experiment {queue_item.experiment_id} with DOI link: {doi_link}")
 
                 # Simulate DOI public folder creation
-                public_folder_path = self._data_service.get_doi_public_path(queue_item.experiment_id, pub_year)
+                public_folder_path = self._data_service.get_doi_public_path(queue_item.experiment_id, pub_year, crud.get_base_path(self._db_manager))
                 self._logger.info(f"[DRY-RUN] Would create DOI public folder: {public_folder_path}")
                 return
 
@@ -290,14 +295,20 @@ class QueueProcessor:
 
                 # Create DOI public folder (only creates if it doesn't exist)
                 try:
-                    public_folder_path = self._data_service.create_doi_public_folder(queue_item.experiment_id, pub_year)
+                    public_folder_path = self._data_service.create_doi_public_folder(queue_item.experiment_id, pub_year, crud.get_base_path(self._db_manager))
                     self._logger.info(f"Created DOI public folder: {public_folder_path}")
 
                     # Create index.html file with DOI information
                     try:
                         creators_str = ", ".join([creator.get("name", "Unknown") for creator in creators]) if creators else None
                         self._data_service.create_doi_index_file(
-                            experiment_id=queue_item.experiment_id, year=pub_year, doi_id=doi_id, title=title, creators=creators_str, version="0.1"
+                            experiment_id=queue_item.experiment_id,
+                            year=pub_year,
+                            doi_id=doi_id,
+                            title=title,
+                            user_base_path=crud.get_base_path(self._db_manager),
+                            creators=creators_str,
+                            version="0.1",
                         )
                     except Exception as html_error:
                         self._logger.warning(f"Failed to create index.html: {html_error}")
