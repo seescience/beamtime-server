@@ -181,7 +181,7 @@ class QueueProcessor:
 
                 # Update experiment database with the folder path
                 try:
-                    crud.update_experiment_folder(self._db_manager, queue_item.experiment_id, str(folder_path))
+                    crud.update_experiment_folder(self._db_manager, queue_item.experiment_id, str(folder_path), base_path)
                     self._logger.info(f"Updated experiment {queue_item.experiment_id} with folder path: {folder_path}")
                 except Exception as db_error:
                     # Don't fail the entire process if database update fails
