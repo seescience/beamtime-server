@@ -64,12 +64,7 @@ class DataManagementService:
                 self._create_acknowledgment_files(ack_folder, acknowledgments)
                 self._logger.info(f"Created {len(acknowledgments)} acknowledgment files in: {ack_folder}")
 
-            # Copy ESAF file if experiment_id is provided
-            if experiment_id:
-                info_folder = folder_path / "info"
-                esaf_copied = self.copy_esaf_file(experiment_id, info_folder)
-                if esaf_copied:
-                    self._logger.info(f"ESAF file processing completed for experiment {experiment_id}")
+            # Note: ESAF file copying is now handled by the queue processor
 
             self._logger.info(f"Created default subfolders (info, pvlog) in: {folder_path}")
             return folder_path
@@ -105,7 +100,7 @@ class DataManagementService:
             except Exception as e:
                 self._logger.warning(f"Failed to create acknowledgment file for ID {ack.get('id')}: {e}")
 
-    def copy_esaf_file(self, experiment_id: int, info_folder: Path) -> bool:
+    def copy_esaf_file(self, experiment_id: int, info_folder: Path) -> Optional[str]:
         """Copy ESAF PDF file to the info folder and beamtime ESAF folder if it exists."""
         try:
             from beamtime_server import crud
@@ -116,14 +111,14 @@ class DataManagementService:
 
             if not esaf_folder or not run_name:
                 self._logger.warning(f"Missing ESAF folder ({esaf_folder}) or run name ({run_name}) for experiment {experiment_id}")
-                return False
+                return None
 
             # Construct search path: esaf_folder/run_name/
             search_path = Path(esaf_folder) / run_name
 
             if not search_path.exists():
                 self._logger.warning(f"ESAF search path does not exist: {search_path}")
-                return False
+                return None
 
             # Search for ESAF file: ESAF-{experiment_id}*.pdf in all subfolders
             pattern = f"ESAF-{experiment_id}*.pdf"
@@ -133,20 +128,19 @@ class DataManagementService:
 
             if not matching_files:
                 self._logger.info(f"No ESAF file found matching pattern {pattern} in {search_path}")
-                return False
+                return None
 
             if len(matching_files) > 1:
                 self._logger.warning(f"Multiple ESAF files found for experiment {experiment_id}: {matching_files}. Using first one.")
 
             source_file = Path(matching_files[0])
-            copied_anywhere = False
+            beamtime_esaf_file_path = None
 
             # Copy to experiment info folder
             info_dest_file = info_folder / source_file.name
             if not info_dest_file.exists():
                 shutil.copy2(source_file, info_dest_file)
                 self._logger.info(f"Copied ESAF file to info folder: {source_file.name} -> {info_dest_file}")
-                copied_anywhere = True
             else:
                 self._logger.info(f"ESAF file already exists in info folder, skipping: {info_dest_file.name}")
 
@@ -163,20 +157,22 @@ class DataManagementService:
                     if not beamtime_dest_file.exists():
                         shutil.copy2(source_file, beamtime_dest_file)
                         self._logger.info(f"Copied ESAF file to beamtime folder: {source_file.name} -> {beamtime_dest_file}")
-                        copied_anywhere = True
+                        beamtime_esaf_file_path = str(beamtime_dest_file)
                     else:
                         self._logger.info(f"ESAF file already exists in beamtime folder, skipping: {beamtime_dest_file.name}")
+                        # Even if we didn't copy, the file exists so we can return its path
+                        beamtime_esaf_file_path = str(beamtime_dest_file)
 
                 except Exception as beamtime_error:
                     self._logger.warning(f"Failed to copy ESAF file to beamtime folder: {beamtime_error}")
             else:
                 self._logger.info("BEAMTIME_FOLDER not configured, skipping beamtime ESAF copy")
 
-            return copied_anywhere
+            return beamtime_esaf_file_path
 
         except Exception as e:
             self._logger.warning(f"Failed to copy ESAF file for experiment {experiment_id}: {e}")
-            return False
+            return None
 
     def create_doi_public_folder(self, experiment_id: int, year: int, public_base_path: Optional[Path] = None) -> Path:
         """Create the public DOI folder structure matching the DOI URL path."""

@@ -55,8 +55,18 @@ class QueueProcessor:
             queue_data = type("QueueData", (), queue_item_data)()
             self._process_queue_item(queue_data)
 
-            # Mark experiment as processed
-            crud.update_experiment_status(self._db_manager, experiment_id, ProcessStatusEnum.PROCESSED)
+            # Determine final status based on old_process_status_id
+            old_status = crud.get_experiment_old_process_status(self._db_manager, experiment_id)
+            if old_status == ProcessStatusEnum.NEW:
+                final_status = ProcessStatusEnum.PROCESSED
+                status_name = "PROCESSED"
+            else:
+                final_status = ProcessStatusEnum.MODIFIED
+                status_name = "MODIFIED"
+
+            # Update experiment status
+            crud.update_experiment_status(self._db_manager, experiment_id, final_status)
+            self._logger.info(f"Set experiment {experiment_id} status to {status_name} (old_process_status_id was {old_status})")
 
             # Remove the queue item after successful processing
             crud.delete_queue_item(self._db_manager, queue_id)
@@ -97,6 +107,20 @@ class QueueProcessor:
                 self._logger.info(f"[DRY-RUN] Simulating folder creation for queue item {queue_item.id}")
                 self._logger.info(f"[DRY-RUN] Would create experiment folder structure at: {queue_item.data_path}")
                 self._logger.info("[DRY-RUN] Would create subfolders: info, pvlog")
+                self._logger.info(f"[DRY-RUN] Would update experiment {queue_item.experiment_id} folder field with: {queue_item.data_path}")
+
+                # Simulate final status determination
+                try:
+                    old_status = crud.get_experiment_old_process_status(self._db_manager, queue_item.experiment_id)
+                    if old_status == ProcessStatusEnum.NEW:
+                        final_status_name = "PROCESSED"
+                    else:
+                        final_status_name = "MODIFIED"
+                    self._logger.info(
+                        f"[DRY-RUN] Would set experiment {queue_item.experiment_id} status to {final_status_name} (old_process_status_id is {old_status})"
+                    )
+                except Exception as e:
+                    self._logger.warning(f"[DRY-RUN] Failed to get old process status: {e}")
 
                 # Check for acknowledgments in dry-run mode
                 if hasattr(queue_item, "acknowledgments") and queue_item.acknowledgments:
@@ -120,6 +144,16 @@ class QueueProcessor:
                         search_path = f"{esaf_folder}/{run_name}"
                         pattern = f"ESAF-{queue_item.experiment_id}*.pdf"
                         self._logger.info(f"[DRY-RUN] Would search for {pattern} in {search_path}")
+                        # Simulate the beamtime folder path where ESAF would be copied
+                        from beamtime_server.utils.config import BeamtimeConfig
+
+                        beamtime_config = BeamtimeConfig()
+                        if beamtime_config.beamtime_folder:
+                            simulated_beamtime_path = f"{beamtime_config.esaf_folder}/{run_name}/ESAF-{queue_item.experiment_id}.pdf"
+                            self._logger.info(f"[DRY-RUN] Would copy ESAF to beamtime folder: {simulated_beamtime_path}")
+                            self._logger.info(
+                                f"[DRY-RUN] Would update experiment {queue_item.experiment_id} esaf_pdf_file field with: {simulated_beamtime_path}"
+                            )
                     else:
                         self._logger.warning(f"[DRY-RUN] Missing ESAF folder or run name for experiment {queue_item.experiment_id}")
                 except Exception as e:
@@ -140,6 +174,27 @@ class QueueProcessor:
                 folder_path = self._data_service.create_folders_at_path(queue_item.data_path, acknowledgments, queue_item.experiment_id)
                 self._logger.info(f"Successfully created folder structure at: {folder_path}")
 
+                # Update experiment database with the folder path
+                try:
+                    crud.update_experiment_folder(self._db_manager, queue_item.experiment_id, str(folder_path))
+                    self._logger.info(f"Updated experiment {queue_item.experiment_id} with folder path: {folder_path}")
+                except Exception as db_error:
+                    # Don't fail the entire process if database update fails
+                    self._logger.warning(f"Failed to update experiment folder path in database: {db_error}")
+
+                # Copy ESAF file and save beamtime path to database
+                try:
+                    info_folder = folder_path / "info"
+                    esaf_beamtime_path = self._data_service.copy_esaf_file(queue_item.experiment_id, info_folder)
+                    if esaf_beamtime_path:
+                        crud.update_experiment_esaf_file(self._db_manager, queue_item.experiment_id, esaf_beamtime_path)
+                        self._logger.info(f"Updated experiment {queue_item.experiment_id} with ESAF beamtime path: {esaf_beamtime_path}")
+                    else:
+                        self._logger.info(f"No ESAF file copied to beamtime folder for experiment {queue_item.experiment_id}")
+                except Exception as esaf_error:
+                    # Don't fail the entire process if ESAF update fails
+                    self._logger.warning(f"Failed to update experiment ESAF file path in database: {esaf_error}")
+
             except Exception as folder_error:
                 # Don't fail the entire process if folder creation fails
                 self._logger.warning(f"Failed to create folders using DataManagementService: {folder_error}")
@@ -152,7 +207,7 @@ class QueueProcessor:
         """Process DOI creation for a queue item."""
         try:
             if self._dry_run:
-                self._logger.info(f"[DRY-RUN] Simulating DOI creation for queue item {queue_item.id}")
+                self._logger.info(f"[DRY-RUN] Simulating DOI creation/update for queue item {queue_item.id}")
 
                 # Get metadata for DOI
                 creators = crud.build_creators_from_spokesperson(self._db_manager, queue_item.experiment_id)
@@ -172,7 +227,7 @@ class QueueProcessor:
                 self._logger.info(
                     f"[DRY-RUN] DOI metadata prepared - DOI: {doi_id}, Title: {title}, Year: {pub_year}, Creators: {len(creators) if creators else 0}"
                 )
-                self._logger.info(f"[DRY-RUN] DOI would be created as: {doi_type}")
+                self._logger.info(f"[DRY-RUN] DOI would be created/updated as: {doi_type}")
                 self._logger.info("[DRY-RUN] DOI includes CC-BY-4.0 license: https://creativecommons.org/licenses/by/4.0/legalcode")
                 self._logger.info(f"[DRY-RUN] DOI points to public data URL: {public_data_url}")
                 self._logger.info(f"[DRY-RUN] Would update experiment {queue_item.experiment_id} with DOI link: {doi_link}")
@@ -182,7 +237,7 @@ class QueueProcessor:
                 self._logger.info(f"[DRY-RUN] Would create DOI public folder: {public_folder_path}")
                 return
 
-            self._logger.info(f"Creating DOI for queue item {queue_item.id}")
+            self._logger.info(f"Creating or updating DOI for queue item {queue_item.id}")
 
             # Get metadata for DOI
             creators = crud.build_creators_from_spokesperson(self._db_manager, queue_item.experiment_id)
@@ -224,8 +279,8 @@ class QueueProcessor:
                 doi=doi_id,
             )
 
-            # Create the DOI
-            result = self._doi_service.create_draft_doi(doi_metadata)
+            # Create or update the DOI (handles existing DOIs automatically)
+            result = self._doi_service.create_or_update_doi(doi_metadata)
             doi_id = result.get("data", {}).get("id")
 
             if doi_id:
@@ -254,7 +309,7 @@ class QueueProcessor:
 
                 # Log based on whether it was created as draft or published
                 doi_status = "draft DOI" if event_type == "draft" else "findable DOI"
-                self._logger.info(f"Successfully created {doi_status} {doi_id} pointing to {public_data_url}")
+                self._logger.info(f"Successfully processed {doi_status} {doi_id} pointing to {public_data_url}")
                 self._logger.info(f"Updated experiment {queue_item.experiment_id} with DOI link: {doi_link}")
             else:
                 raise Exception("DOI creation returned no ID")

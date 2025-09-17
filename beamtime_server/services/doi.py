@@ -283,3 +283,24 @@ class DOIService:
             message = f"Unexpected error while getting DOI status: {e}"
             self._logger.error(message)
             raise DOIError(message) from e
+
+    def create_or_update_doi(self, metadata: DOISchema) -> dict:
+        """Create a new DOI or update existing one if it already exists."""
+        try:
+            # First try to create the DOI
+            return self.create_draft_doi(metadata)
+
+        except DOIError as e:
+            # Check if error is about DOI already existing (HTTP 422)
+            if "422" in str(e) and "already been taken" in str(e):
+                self._logger.info(f"DOI {metadata.doi} already exists, updating instead of creating")
+                # Extract DOI ID from metadata
+                doi_id = metadata.doi
+                if not doi_id:
+                    raise DOIError("Cannot update DOI: no DOI ID provided in metadata")
+
+                # Update the existing DOI
+                return self.update_doi(doi_id, metadata)
+            else:
+                # Re-raise other DOIErrors
+                raise

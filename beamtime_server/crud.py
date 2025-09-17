@@ -15,7 +15,7 @@ from typing import Optional
 
 from sqlalchemy import delete, select, update
 
-from beamtime_server.models import ExperimentItem, Person, ProcessStatusEnum, QueueItem
+from beamtime_server.models import ExperimentItem, Person, QueueItem
 from beamtime_server.utils.database import DBException
 
 __all__ = [
@@ -24,17 +24,18 @@ __all__ = [
     "delete_queue_item",
     "get_experiment_title",
     "update_experiment_doi_link",
+    "update_experiment_folder",
+    "update_experiment_esaf_file",
+    "get_experiment_old_process_status",
     "get_experiment_start_date",
 ]
 
 
 def get_next_queue_item(db_manager) -> Optional[dict]:
-    """Get the next pending queue item (status = PENDING)."""
+    """Get the next queue item to process."""
     with db_manager.get_session() as session:
         try:
-            queue_item = session.execute(
-                select(QueueItem).where(QueueItem.process_status_id == ProcessStatusEnum.PENDING).order_by(QueueItem.id).limit(1)
-            ).scalar_one_or_none()
+            queue_item = session.execute(select(QueueItem).order_by(QueueItem.id).limit(1)).scalar_one_or_none()
 
             if queue_item:
                 # Return dict with the data we need to avoid session issues
@@ -42,7 +43,7 @@ def get_next_queue_item(db_manager) -> Optional[dict]:
                     "id": queue_item.id,
                     "experiment_id": queue_item.experiment_id,
                     "create_doi": queue_item.create_doi,
-                    "proposal_id": queue_item.proposal_id,
+                    "draft_doi": queue_item.draft_doi,
                     "data_path": queue_item.data_path,
                     "pvlog_path": queue_item.pvlog_path,
                     "acknowledgments": queue_item.acknowledgments,
@@ -146,6 +147,36 @@ def update_experiment_doi_link(db_manager, experiment_id: int, doi_link: str) ->
             return result.rowcount > 0
         except Exception as e:
             raise DBException(f"Error updating experiment {experiment_id} DOI link: {e}")
+
+
+def update_experiment_folder(db_manager, experiment_id: int, folder_path: str) -> bool:
+    """Update experiment folder field with the created folder path."""
+    with db_manager.get_session() as session:
+        try:
+            result = session.execute(update(ExperimentItem).where(ExperimentItem.id == experiment_id).values(folder=folder_path))
+            return result.rowcount > 0
+        except Exception as e:
+            raise DBException(f"Error updating experiment {experiment_id} folder path: {e}")
+
+
+def update_experiment_esaf_file(db_manager, experiment_id: int, esaf_file_path: str) -> bool:
+    """Update experiment esaf_pdf_file field with the beamtime ESAF file path."""
+    with db_manager.get_session() as session:
+        try:
+            result = session.execute(update(ExperimentItem).where(ExperimentItem.id == experiment_id).values(esaf_pdf_file=esaf_file_path))
+            return result.rowcount > 0
+        except Exception as e:
+            raise DBException(f"Error updating experiment {experiment_id} ESAF file path: {e}")
+
+
+def get_experiment_old_process_status(db_manager, experiment_id: int) -> Optional[int]:
+    """Get experiment old_process_status_id."""
+    with db_manager.get_session() as session:
+        try:
+            experiment = session.execute(select(ExperimentItem).where(ExperimentItem.id == experiment_id)).scalar_one_or_none()
+            return experiment.old_process_status_id if experiment else None
+        except Exception as e:
+            raise DBException(f"Error getting old process status for experiment {experiment_id}: {e}")
 
 
 def get_experiment_start_date(db_manager, experiment_id: int) -> Optional[str]:

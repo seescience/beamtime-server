@@ -52,13 +52,11 @@ class QueueItem(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     experiment_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    proposal_id: Mapped[int] = mapped_column(Integer, nullable=False)
     create_doi: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     draft_doi: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     data_path: Mapped[str] = mapped_column(Text, nullable=True)
     pvlog_path: Mapped[str] = mapped_column(Text, nullable=True)
     acknowledgments: Mapped[str] = mapped_column(Text, nullable=True)
-    process_status_id: Mapped[int] = mapped_column(Integer, ForeignKey("process_status.id"), nullable=False)
 
 
 class ExperimentItem(Base):
@@ -87,6 +85,7 @@ class ExperimentItem(Base):
     spokesperson_id: Mapped[int] = mapped_column(Integer, ForeignKey("person.id"), nullable=True)
     beamline_contact_id: Mapped[int] = mapped_column(Integer, ForeignKey("person.id"), nullable=True)
     process_status_id: Mapped[int] = mapped_column(Integer, ForeignKey("process_status.id"), nullable=True)
+    old_process_status_id: Mapped[int] = mapped_column(Integer, ForeignKey("process_status.id"), nullable=True)
 
 
 class Acknowledgment(Base):
