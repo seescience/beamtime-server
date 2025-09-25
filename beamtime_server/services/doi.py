@@ -114,6 +114,7 @@ class DOIError(Exception):
 class DOIService:
     """A class for creating, updating, publishing and deleting DOIs using DataCite API."""
 
+    dry_run: bool = field(default=False, compare=False, repr=False)
     _session: requests.Session | None = field(default=None)
     _config: DOIConfig = field(init=False, compare=False, repr=False, default=DOIConfig())
     _logger: Logger = field(init=False, compare=False, repr=False, default=get_logger())
@@ -132,17 +133,35 @@ class DOIService:
             headers = {"Content-Type": "application/vnd.api+json"}
             payload = metadata.to_datacite_payload(prefix=self._config.prefix)
 
-            self._logger.info(f"Creating draft DOI {payload['data']['attributes'].get('doi')}")
-            response = self._session.post(url, json=payload, headers=headers, auth=auth)
-
-            if response.status_code == 201:
-                doi_data = response.json()
-                self._logger.info(f"Successfully created draft DOI: {doi_data['data']['id']}")
-                return doi_data
+            doi_id = payload["data"]["attributes"].get("doi")
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would create draft DOI: {doi_id}")
+                # Return a simulated successful response
+                return {
+                    "data": {
+                        "id": doi_id,
+                        "type": "dois",
+                        "attributes": {
+                            "doi": doi_id,
+                            "state": "draft",
+                            "url": f"https://doi.org/{doi_id}",
+                            "titles": payload["data"]["attributes"].get("titles", []),
+                            "publisher": payload["data"]["attributes"].get("publisher"),
+                            "publicationYear": payload["data"]["attributes"].get("publicationYear"),
+                        },
+                    }
+                }
             else:
-                error_message = f"Failed to create draft DOI: HTTP {response.status_code} - {response.text}"
-                self._logger.error(error_message)
-                raise DOIError(error_message)
+                self._logger.info(f"Creating draft DOI {doi_id}")
+                response = self._session.post(url, json=payload, headers=headers, auth=auth)
+                if response.status_code == 201:
+                    doi_data = response.json()
+                    self._logger.info(f"Successfully created draft DOI: {doi_data['data']['id']}")
+                    return doi_data
+                else:
+                    error_message = f"Failed to create draft DOI: HTTP {response.status_code} - {response.text}"
+                    self._logger.error(error_message)
+                    raise DOIError(error_message)
 
         except DOIError:
             # Re-raise DOIError as-is
@@ -163,6 +182,11 @@ class DOIService:
             auth = (self._config.username, self._config.password)
             headers = {"Content-Type": "application/vnd.api+json"}
             payload = metadata.to_datacite_payload(prefix=self._config.prefix, doi_id=doi_id)
+
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would update DOI: {doi_id} with payload: {payload}")
+                # Return mock successful response
+                return {"data": {"id": doi_id, "type": "dois", "attributes": {"doi": doi_id, "state": "draft"}}}
 
             self._logger.info(f"Updating DOI: {doi_id}")
             response = self._session.put(url, json=payload, headers=headers, auth=auth)
@@ -228,6 +252,11 @@ class DOIService:
             # Create minimal payload with just the event change
             payload = {"data": {"type": "dois", "id": doi_id, "attributes": {"event": "publish"}}}
 
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would publish DOI to make it findable: {doi_id}")
+                # Return mock successful response showing published state
+                return {"data": {"id": doi_id, "type": "dois", "attributes": {"doi": doi_id, "state": "findable"}}}
+
             self._logger.info(f"Publishing DOI to make it findable: {doi_id}")
             response = self._session.put(url, json=payload, headers=headers, auth=auth)
 
@@ -259,18 +288,21 @@ class DOIService:
             auth = (self._config.username, self._config.password)
             headers = {"Content-Type": "application/vnd.api+json"}
 
-            self._logger.debug(f"Checking status of DOI: {doi_id}")
-            response = self._session.get(url, headers=headers, auth=auth)
-
-            if response.status_code == 200:
-                doi_data = response.json()
-                state = doi_data.get("data", {}).get("attributes", {}).get("state", "unknown")
-                self._logger.debug(f"DOI {doi_id} current state: {state}")
-                return doi_data
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would check status of DOI: {doi_id}")
+                # Return a simulated successful response
+                return {"data": {"id": doi_id, "type": "dois", "attributes": {"doi": doi_id, "state": "draft", "url": f"https://doi.org/{doi_id}"}}}
             else:
-                error_message = f"Failed to get DOI status: HTTP {response.status_code} - {response.text}"
-                self._logger.error(error_message)
-                raise DOIError(error_message)
+                response = self._session.get(url, headers=headers, auth=auth)
+                if response.status_code == 200:
+                    doi_data = response.json()
+                    state = doi_data.get("data", {}).get("attributes", {}).get("state", "unknown")
+                    self._logger.debug(f"DOI {doi_id} current state: {state}")
+                    return doi_data
+                else:
+                    error_message = f"Failed to get DOI status: HTTP {response.status_code} - {response.text}"
+                    self._logger.error(error_message)
+                    raise DOIError(error_message)
 
         except DOIError:
             # Re-raise DOIError as-is

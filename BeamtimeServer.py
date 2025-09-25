@@ -27,12 +27,6 @@ class BeamtimeServer:
         self._logger = get_logger()
         self._db_manager = DatabaseManager()
         self._queue_processor = QueueProcessor(self._db_manager, dry_run=dry_run)
-        self._dry_run = dry_run
-
-        if dry_run:
-            self._logger.info("Beamtime Server initialized in DRY-RUN mode")
-        else:
-            self._logger.info("Beamtime Server initialized")
 
     def _run_tests(self) -> None:
         """Run all application tests."""

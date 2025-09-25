@@ -56,6 +56,7 @@ def get_next_queue_item(db_manager) -> Optional[dict]:
                 "data_path": queue_item.data_path,
                 "acknowledgments": queue_item.acknowledgments,
                 "draft_doi": queue_item.draft_doi,
+                "create_doi": queue_item.create_doi,
             }
         except Exception as e:
             raise DBException(f"Error getting next queue item: {e}")
@@ -153,3 +154,23 @@ def get_experiment_run_name(db_manager, experiment_id: int) -> Optional[str]:
             return result.run.name if result and result.run else None
         except Exception as e:
             raise DBException(f"Error getting run name for experiment {experiment_id}: {e}")
+
+
+def update_experiment(db_manager, experiment_id: int, **kwargs) -> bool:
+    """Update experiment by ID with provided keyword arguments."""
+    with db_manager.get_session() as session:
+        try:
+            experiment = session.get(ExperimentItem, experiment_id)
+            if not experiment:
+                return False
+
+            # Update fields based on kwargs
+            for field, value in kwargs.items():
+                if hasattr(experiment, field):
+                    setattr(experiment, field, value)
+
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            raise DBException(f"Error updating experiment {experiment_id}: {e}")

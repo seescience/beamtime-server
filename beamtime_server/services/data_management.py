@@ -18,6 +18,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Optional
 
+from beamtime_server import crud
 from beamtime_server.utils import DatabaseManager, DOIConfig, get_logger
 from beamtime_server.utils.config import BeamtimeConfig
 
@@ -36,37 +37,42 @@ class DataManagementError(Exception):
 class DataManagementService:
     """A service for managing experiment data folders and structure."""
 
-    db_manager: Optional[DatabaseManager] = None
+    db_manager: DatabaseManager = field(compare=False, repr=False)
+    dry_run: bool = field(default=False, compare=False, repr=False)
+
     _logger: Logger = field(init=False, compare=False, repr=False, default=get_logger())
     _doi_config: DOIConfig = field(init=False, compare=False, repr=False, default=DOIConfig())
     _beamtime_config: BeamtimeConfig = field(init=False, compare=False, repr=False, default=BeamtimeConfig())
 
-    def create_folders_at_path(self, path: str | Path, user_base_path: str, acknowledgments: list[dict] = None, experiment_id: int = None) -> Path:
+    def create_folders_at_path(self, path: str | Path, user_base_path: str, acknowledgments: list[dict] = None) -> Path:
         """Create folder structure directly at the specified path with default subfolders."""
         try:
-            folder_path = Path(user_base_path) / Path(path)
-
-            # Create the main folder
-            folder_path.mkdir(parents=True, exist_ok=True)
-            self._logger.info(f"Created folder: {folder_path}")
-
-            # Create default subfolders
+            # Strip leading slash from path to ensure it's treated as relative to base_path
+            path_str = str(path).lstrip("/")
+            folder_path = Path(user_base_path) / path_str
             subfolders = ["info", "pvlog"]
-            for subfolder in subfolders:
-                subfolder_path = folder_path / subfolder
-                subfolder_path.mkdir(parents=True, exist_ok=True)
+            ack_folder = folder_path / "info" / "acknowledgments" if acknowledgments else None
 
-            # Create acknowledgments subfolder and files if acknowledgments exist
-            if acknowledgments:
-                ack_folder = folder_path / "info" / "acknowledgments"
-                ack_folder.mkdir(parents=True, exist_ok=True)
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would create folder: {folder_path}")
+                self._logger.info(f"[DRY-RUN] Would create subfolders: {subfolders}")
+                self._logger.info(f"[DRY-RUN] Would create acknowledgments folder and {len(acknowledgments)} files") if acknowledgments else None
+            else:
+                # Create the main folder
+                folder_path.mkdir(parents=True, exist_ok=True)
+                self._logger.info(f"Created folder: {folder_path}")
 
-                self._create_acknowledgment_files(ack_folder, acknowledgments)
-                self._logger.info(f"Created {len(acknowledgments)} acknowledgment files in: {ack_folder}")
+                # Create default subfolders
+                for subfolder in subfolders:
+                    subfolder_path = folder_path / subfolder
+                    subfolder_path.mkdir(parents=True, exist_ok=True)
+                self._logger.info(f"Created default subfolders {subfolders} in: {folder_path}")
 
-            # Note: ESAF file copying is now handled by the queue processor
-
-            self._logger.info(f"Created default subfolders (info, pvlog) in: {folder_path}")
+                # Create acknowledgments folder and files if provided
+                if ack_folder:
+                    ack_folder.mkdir(parents=True, exist_ok=True)
+                    self._create_acknowledgment_files(ack_folder, acknowledgments)
+                    self._logger.info(f"Created {len(acknowledgments)} acknowledgment files in: {ack_folder}")
 
             # Remove base path prefix and return with leading slash
             if user_base_path:
@@ -113,10 +119,8 @@ class DataManagementService:
     def copy_esaf_file(self, experiment_id: int, info_folder: Path, user_base_path: str) -> Optional[str]:
         """Copy ESAF PDF file to the info folder and beamtime ESAF folder if it exists."""
         try:
-            from beamtime_server import crud
-
             # Get ESAF PDF folder and run name
-            esaf_folder = crud.get_esaf_pdf_folder(self.db_manager)
+            esaf_folder = crud.get_info_value(self.db_manager, "esaf_pdf_folder")
             run_name = crud.get_experiment_run_name(self.db_manager, experiment_id)
 
             if not esaf_folder or not run_name:
@@ -140,41 +144,42 @@ class DataManagementService:
                 self._logger.info(f"No ESAF file found matching pattern {pattern} in {search_path}")
                 return None
 
-            if len(matching_files) > 1:
-                self._logger.warning(f"Multiple ESAF files found for experiment {experiment_id}: {matching_files}. Using first one.")
-
             source_file = Path(matching_files[0])
             beamtime_esaf_file_path = None
 
             # Copy to experiment info folder
             info_dest_file = info_folder / source_file.name
-            if not info_dest_file.exists():
-                shutil.copy2(source_file, info_dest_file)
-                self._logger.info(f"Copied ESAF file to info folder: {source_file.name} -> {info_dest_file}")
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would copy ESAF file to info folder: {source_file.name} -> {info_dest_file}")
             else:
-                self._logger.info(f"ESAF file already exists in info folder, skipping: {info_dest_file.name}")
+                if not info_dest_file.exists():
+                    shutil.copy2(source_file, info_dest_file)
+                    self._logger.info(f"Copied ESAF file to info folder: {source_file.name} -> {info_dest_file}")
+                else:
+                    self._logger.info(f"ESAF file already exists in info folder, skipping: {info_dest_file.name}")
 
             # Copy to beamtime ESAF folder if configured
             if self._beamtime_config.beamtime_folder:
-                try:
-                    # Create destination with base path prepended: user_base_path/BEAMTIME_FOLDER/esaf/run_name/
-                    beamtime_esaf_path = Path(user_base_path) / Path(self._beamtime_config.beamtime_folder) / "esaf" / run_name
-                    beamtime_esaf_path.mkdir(parents=True, exist_ok=True)
+                # Build the paths for beamtime ESAF and the destination file
+                beamtime_esaf_path = Path(user_base_path) / Path(self._beamtime_config.beamtime_folder) / "esaf" / run_name
+                beamtime_dest_file = beamtime_esaf_path / source_file.name
+                beamtime_esaf_file_path = str(beamtime_dest_file)
 
-                    beamtime_dest_file = beamtime_esaf_path / source_file.name
+                if self.dry_run:
+                    self._logger.info(f"[DRY-RUN] Would copy ESAF file to beamtime folder: {source_file.name} -> {beamtime_esaf_path}")
 
-                    # Only copy if destination doesn't exist (never override)
-                    if not beamtime_dest_file.exists():
-                        shutil.copy2(source_file, beamtime_dest_file)
-                        self._logger.info(f"Copied ESAF file to beamtime folder: {source_file.name} -> {beamtime_dest_file}")
-                        beamtime_esaf_file_path = str(beamtime_dest_file)
-                    else:
-                        self._logger.info(f"ESAF file already exists in beamtime folder, skipping: {beamtime_dest_file.name}")
-                        # Even if we didn't copy, the file exists so we can return its path
-                        beamtime_esaf_file_path = str(beamtime_dest_file)
+                else:
+                    try:
+                        beamtime_esaf_path.mkdir(parents=True, exist_ok=True)
+                        # Only copy if destination doesn't exist (never override)
+                        if not beamtime_dest_file.exists():
+                            shutil.copy2(source_file, beamtime_dest_file)
+                            self._logger.info(f"Copied ESAF file to beamtime folder: {source_file.name} -> {beamtime_dest_file}")
+                        else:
+                            self._logger.info(f"ESAF file already exists in beamtime folder, skipping: {beamtime_dest_file.name}")
 
-                except Exception as beamtime_error:
-                    self._logger.warning(f"Failed to copy ESAF file to beamtime folder: {beamtime_error}")
+                    except Exception as beamtime_error:
+                        self._logger.warning(f"Failed to copy ESAF file to beamtime folder: {beamtime_error}")
             else:
                 self._logger.info("BEAMTIME_FOLDER not configured, skipping beamtime ESAF copy")
 
@@ -203,10 +208,12 @@ class DataManagementService:
             # Create the public DOI folder structure: {year}/{experiment_id}
             public_doi_path = Path(user_base_path) / public_base_path / str(year) / str(experiment_id)
 
-            if not public_doi_path.exists():
-                public_doi_path.mkdir(parents=True, exist_ok=True)
-                self._logger.info(f"Created DOI public folder: {public_doi_path}")
-
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would create DOI public folder: {public_doi_path}")
+            else:
+                if not public_doi_path.exists():
+                    public_doi_path.mkdir(parents=True, exist_ok=True)
+                    self._logger.info(f"Created DOI public folder: {public_doi_path}")
             return public_doi_path
 
         except (PermissionError, OSError) as e:
@@ -296,14 +303,19 @@ class DataManagementService:
             index_file_path = public_folder_path / "index.html"
 
             # Only create if it doesn't exist to avoid overwriting
-            if not index_file_path.exists():
-                with open(index_file_path, "w", encoding="utf-8") as f:
-                    f.write(html_content)
-                self._logger.info(f"Created index.html for DOI: {index_file_path}")
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would create index.html for DOI: {index_file_path}")
                 return True
             else:
-                self._logger.info(f"Index.html already exists, skipping: {index_file_path}")
-                return False
+                # Only create if it does not exist to avoid overwriting
+                if not index_file_path.exists():
+                    with open(index_file_path, "w", encoding="utf-8") as f:
+                        f.write(html_content)
+                    self._logger.info(f"Created index.html for DOI: {index_file_path}")
+                    return True
+                else:
+                    self._logger.info(f"Index.html already exists, skipping: {index_file_path}")
+                    return False
 
         except Exception as e:
             message = f"Failed to create index.html for experiment {experiment_id}: {e}"

@@ -1,9 +1,9 @@
 # ----------------------------------------------------------------------------------
 # Project: Beamtime-Server
-# File: beamtime_server/__init__.py
+# File: beamtime_server/processors/__init__.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# This module is the main package initializer for the Beamtime Server.
+# This module initializes the processes package for the Beamtime Server.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -11,8 +11,8 @@
 # Copyright (c) 2025 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+from beamtime_server.processors.doi_processor import DOIProcessor
+from beamtime_server.processors.folder_processor import FolderProcessor
+from beamtime_server.processors.queue_processor import QueueProcessor
 
-from beamtime_server.processors import QueueProcessor
-from beamtime_server.utils import DatabaseManager, get_logger
-
-__all__ = ["DatabaseManager", "get_logger", "QueueProcessor"]
+__all__ = ["DOIProcessor", "FolderProcessor", "QueueProcessor"]
