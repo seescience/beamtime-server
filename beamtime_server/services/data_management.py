@@ -161,7 +161,7 @@ class DataManagementService:
             # Copy to beamtime ESAF folder if configured
             if self._beamtime_config.beamtime_folder:
                 # Build the paths for beamtime ESAF and the destination file
-                beamtime_esaf_path = Path(user_base_path) / Path(self._beamtime_config.beamtime_folder) / "esaf" / run_name
+                beamtime_esaf_path = Path(self._beamtime_config.beamtime_folder) / "esaf" / run_name
                 beamtime_dest_file = beamtime_esaf_path / source_file.name
                 beamtime_esaf_file_path = str(beamtime_dest_file)
 
