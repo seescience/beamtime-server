@@ -180,6 +180,38 @@ class FolderProcessor:
         except Exception as e:
             self._logger.warning(f"Failed to copy pvlog file for experiment {queue_item.experiment_id}: {e}")
 
+    def write_doi_info_file(self, queue_item) -> None:
+        """Write any existing DOIs to a DOIs.txt file in the experiment's info folder."""
+        try:
+            dois = crud.get_experiment_dois(self._db_manager, queue_item.experiment_id)
+            sections = []
+            if dois.get("sees_doi"):
+                sections.append(f"SEES DOI\n\n{dois['sees_doi']}")
+            if dois.get("aps_doi"):
+                sections.append(f"APS DOI\n\n{dois['aps_doi']}")
+
+            if not sections:
+                return
+
+            base_path = crud.get_info_value(self._db_manager, "base_path")
+            folder_path_str = str(queue_item.data_path).lstrip("/")
+            info_folder = Path(base_path) / folder_path_str / "info"
+            doi_file = info_folder / "DOIs.txt"
+
+            if doi_file.exists():
+                self._logger.info(f"DOIs.txt already exists, skipping: {doi_file}")
+                return
+
+            separator = "\n\n" + ("-" * 80) + "\n\n"
+            content = separator.join(sections) + "\n"
+
+            info_folder.mkdir(parents=True, exist_ok=True)
+            doi_file.write_text(content, encoding="utf-8")
+            self._logger.info(f"Wrote {len(sections)} DOI(s) to: {doi_file}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed to write DOIs.txt for experiment {queue_item.experiment_id}: {e}")
+
     @staticmethod
     def _normalize_pvlog_path(path: str) -> str:
         """Strip any /home/... prefix and rewrite to /cars4 or /cars6 based on the real path."""

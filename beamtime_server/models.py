@@ -84,6 +84,7 @@ class ExperimentItem(Base):
     time_request: Mapped[int] = mapped_column(Integer, nullable=True)
     start_date: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     end_date: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    aps_doi: Mapped[str] = mapped_column(Text, nullable=True)
     pvlog_file: Mapped[str] = mapped_column(Text, nullable=True)
 
     run_id: Mapped[int] = mapped_column(Integer, ForeignKey("run.id"), nullable=True)
