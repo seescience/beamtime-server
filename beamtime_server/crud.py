@@ -54,6 +54,7 @@ def get_next_queue_item(db_manager) -> Optional[dict]:
                 "id": queue_item.id,
                 "experiment_id": queue_item.experiment_id,
                 "data_path": queue_item.data_path,
+                "pvlog_path": queue_item.pvlog_path,
                 "acknowledgments": queue_item.acknowledgments,
                 "draft_doi": queue_item.draft_doi,
                 "create_doi": queue_item.create_doi,

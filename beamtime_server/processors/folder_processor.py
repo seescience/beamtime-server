@@ -104,6 +104,11 @@ class FolderProcessor:
             # Copy ESAF file
             self._copy_esaf_file(queue_item, base_path, folder_path)
 
+            # Copy pvlog file if provided
+            pvlog_path = getattr(queue_item, "pvlog_path", None)
+            if pvlog_path:
+                self._copy_pvlog_file(queue_item, base_path, folder_path, pvlog_path)
+
             return True
 
         except Exception as e:
@@ -152,3 +157,12 @@ class FolderProcessor:
 
         except Exception as e:
             self._logger.warning(f"Failed to process ESAF file: {e}")
+
+    def _copy_pvlog_file(self, queue_item, base_path: str, folder_path: str, pvlog_path: str) -> None:
+        """Copy pvlog file into the experiment's pvlog subfolder."""
+        try:
+            folder_path_str = str(folder_path).lstrip("/")
+            pvlog_folder = Path(base_path) / folder_path_str / "pvlog"
+            self._data_service.copy_pvlog_file(pvlog_path=pvlog_path, pvlog_folder=pvlog_folder)
+        except Exception as e:
+            self._logger.warning(f"Failed to copy pvlog file for experiment {queue_item.experiment_id}: {e}")

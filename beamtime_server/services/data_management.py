@@ -198,6 +198,34 @@ class DataManagementService:
             self._logger.warning(f"Failed to copy ESAF file for experiment {experiment_id}: {e}")
             return None
 
+    def copy_pvlog_file(self, pvlog_path: str, pvlog_folder: Path) -> bool:
+        """Copy pvlog file into the experiment's pvlog folder."""
+        try:
+            stripped = pvlog_path.removeprefix("/home/gse_admin")
+            source_file = Path(stripped) if stripped.startswith("/") else Path(pvlog_path)
+
+            if not source_file.exists():
+                self._logger.warning(f"pvlog file not found: {source_file}")
+                return False
+
+            dest_file = pvlog_folder / "pvlog.yaml"
+
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would copy pvlog file: {source_file} -> {dest_file}")
+            else:
+                pvlog_folder.mkdir(parents=True, exist_ok=True)
+                if not dest_file.exists():
+                    shutil.copy2(source_file, dest_file)
+                    self._logger.info(f"Copied pvlog file: {source_file.name} -> {dest_file}")
+                else:
+                    self._logger.info(f"pvlog file already exists, skipping: {dest_file.name}")
+
+            return True
+
+        except Exception as e:
+            self._logger.warning(f"Failed to copy pvlog file {pvlog_path}: {e}")
+            return False
+
     def create_doi_public_folder(self, experiment_id: int, year: int, user_base_path: str, public_base_path: Optional[Path] = None) -> Path:
         """Create the public DOI folder structure matching the DOI URL path."""
         if public_base_path is None:
