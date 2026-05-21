@@ -197,15 +197,15 @@ class DataManagementService:
             self._logger.warning(f"Failed to copy ESAF file for experiment {experiment_id}: {e}")
             return None
 
-    def copy_pvlog_file(self, pvlog_path: str, pvlog_folder: Path) -> bool:
-        """Copy pvlog file into the experiment's pvlog folder."""
+    def copy_pvlog_file(self, pvlog_path: str, pvlog_folder: Path) -> Optional[str]:
+        """Copy pvlog file into the experiment's pvlog folder and return the normalized destination path."""
         try:
             stripped = pvlog_path.removeprefix("/home/gse_admin")
             source_file = Path(stripped) if stripped.startswith("/") else Path(pvlog_path)
 
             if not source_file.exists():
                 self._logger.warning(f"pvlog file not found: {source_file}")
-                return False
+                return None
 
             dest_file = pvlog_folder / "pvlog.yaml"
 
@@ -219,11 +219,11 @@ class DataManagementService:
                 else:
                     self._logger.info(f"pvlog file already exists, skipping: {dest_file.name}")
 
-            return True
+            return str(dest_file)
 
         except Exception as e:
             self._logger.warning(f"Failed to copy pvlog file {pvlog_path}: {e}")
-            return False
+            return None
 
     def create_doi_public_folder(self, experiment_id: int, year: int, user_base_path: str, public_base_path: Optional[Path] = None) -> Path:
         """Create the public DOI folder structure matching the DOI URL path."""

@@ -159,10 +159,25 @@ class FolderProcessor:
             self._logger.warning(f"Failed to process ESAF file: {e}")
 
     def _copy_pvlog_file(self, queue_item, base_path: str, folder_path: str, pvlog_path: str) -> None:
-        """Copy pvlog file into the experiment's pvlog subfolder."""
+        """Copy pvlog file into the experiment's pvlog subfolder and update experiment record."""
         try:
             folder_path_str = str(folder_path).lstrip("/")
             pvlog_folder = Path(base_path) / folder_path_str / "pvlog"
-            self._data_service.copy_pvlog_file(pvlog_path=pvlog_path, pvlog_folder=pvlog_folder)
+            dest_path = self._data_service.copy_pvlog_file(pvlog_path=pvlog_path, pvlog_folder=pvlog_folder)
+
+            if dest_path:
+                normalized = self._normalize_pvlog_path(dest_path)
+                crud.update_experiment(self._db_manager, queue_item.experiment_id, pvlog_file=normalized)
+                self._logger.info(f"Updated experiment {queue_item.experiment_id} with pvlog path: {normalized}")
+
         except Exception as e:
             self._logger.warning(f"Failed to copy pvlog file for experiment {queue_item.experiment_id}: {e}")
+
+    @staticmethod
+    def _normalize_pvlog_path(path: str) -> str:
+        """Strip any /home/... prefix and rewrite to /cars4 or /cars6 based on the real path."""
+        import re
+        normalized = re.sub(r"^/home/[^/]+", "", path)
+        if not normalized.startswith("/"):
+            normalized = "/" + normalized
+        return normalized
