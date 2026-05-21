@@ -12,6 +12,7 @@
 # ----------------------------------------------------------------------------------
 
 import glob
+import re
 import shutil
 from dataclasses import dataclass, field
 from logging import Logger
@@ -51,12 +52,12 @@ class DataManagementService:
             path_str = str(path).lstrip("/")
             folder_path = Path(user_base_path) / path_str
             subfolders = ["info", "pvlog"]
-            ack_folder = folder_path / "info" / "acknowledgments" if acknowledgments else None
+            info_folder = folder_path / "info"
 
             if self.dry_run:
                 self._logger.info(f"[DRY-RUN] Would create folder: {folder_path}")
                 self._logger.info(f"[DRY-RUN] Would create subfolders: {subfolders}")
-                self._logger.info(f"[DRY-RUN] Would create acknowledgments folder and {len(acknowledgments)} files") if acknowledgments else None
+                self._logger.info(f"[DRY-RUN] Would create acknowledgments file with {len(acknowledgments)} entries") if acknowledgments else None
             else:
                 # Create the main folder
                 folder_path.mkdir(parents=True, exist_ok=True)
@@ -68,11 +69,10 @@ class DataManagementService:
                     subfolder_path.mkdir(parents=True, exist_ok=True)
                 self._logger.info(f"Created default subfolders {subfolders} in: {folder_path}")
 
-                # Create acknowledgments folder and files if provided
-                if ack_folder:
-                    ack_folder.mkdir(parents=True, exist_ok=True)
-                    self._create_acknowledgment_files(ack_folder, acknowledgments)
-                    self._logger.info(f"Created {len(acknowledgments)} acknowledgment files in: {ack_folder}")
+                # Create combined acknowledgments file if provided
+                if acknowledgments:
+                    self._create_acknowledgment_file(info_folder, acknowledgments)
+                    self._logger.info(f"Created acknowledgments file with {len(acknowledgments)} entries in: {info_folder}")
 
             # Remove base path prefix and return with leading slash
             if user_base_path:
@@ -90,31 +90,31 @@ class DataManagementService:
             self._logger.error(message)
             raise DataManagementError(message, operation="create_folders_at_path", original_error=e)
 
-    def _create_acknowledgment_files(self, ack_folder: Path, acknowledgments: list[dict]) -> None:
-        """Create text files for each acknowledgment in the acknowledgments folder."""
-        for ack in acknowledgments:
-            try:
-                # Create safe filename from title or use ID
-                title = ack.get("title", f"Acknowledgment_{ack['id']}")
-                # Replace unsafe characters for filename
-                safe_title = "".join(c for c in title if c.isalnum() or c in (" ", "-", "_")).rstrip()
-                filename = f"{safe_title}.txt"
+    def _create_acknowledgment_file(self, info_folder: Path, acknowledgments: list[dict]) -> None:
+        """Create a single combined acknowledgments text file in the info folder."""
+        file_path = info_folder / "acknowledgments.txt"
 
-                file_path = ack_folder / filename
+        if file_path.exists():
+            self._logger.info(f"Acknowledgments file already exists, skipping: {file_path.name}")
+            return
 
-                # Only create if file doesn't exist (never override)
-                if not file_path.exists():
-                    content = f"Title: {ack.get('title', 'N/A')}\n\n{ack.get('text', 'No content available')}"
+        try:
+            sections = []
+            for ack in acknowledgments:
+                title = ack.get("title", f"Acknowledgment_{ack.get('id', '?')}")
+                text = ack.get("text", "No content available")
+                sections.append(f"Title: {title}\n\n{text}")
 
-                    with open(file_path, "w", encoding="utf-8") as f:
-                        f.write(content)
+            separator = "\n\n" + ("-" * 80) + "\n\n"
+            content = separator.join(sections)
 
-                    self._logger.info(f"Created acknowledgment file: {filename}")
-                else:
-                    self._logger.info(f"Acknowledgment file already exists, skipping: {filename}")
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
 
-            except Exception as e:
-                self._logger.warning(f"Failed to create acknowledgment file for ID {ack.get('id')}: {e}")
+            self._logger.info(f"Created acknowledgments file: {file_path.name}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed to create acknowledgments file: {e}")
 
     def copy_esaf_file(self, experiment_id: int, info_folder: Path, user_base_path: str) -> Optional[str]:
         """Copy ESAF PDF file to the info folder and beamtime ESAF folder if it exists."""
@@ -161,7 +161,7 @@ class DataManagementService:
             # Copy to beamtime ESAF folder if configured
             if self._beamtime_config.beamtime_folder:
                 # Build the paths for beamtime ESAF and the destination file
-                beamtime_esaf_path = Path(user_base_path) / Path(self._beamtime_config.beamtime_folder) / "esaf" / run_name
+                beamtime_esaf_path = Path(self._beamtime_config.beamtime_folder) / "esaf" / run_name
                 beamtime_dest_file = beamtime_esaf_path / source_file.name
                 beamtime_esaf_file_path = str(beamtime_dest_file)
 
@@ -197,6 +197,63 @@ class DataManagementService:
         except Exception as e:
             self._logger.warning(f"Failed to copy ESAF file for experiment {experiment_id}: {e}")
             return None
+
+    def copy_pvlog_file(self, pvlog_path: str, pvlog_folder: Path, start_date=None, end_date=None) -> Optional[str]:
+        """Copy pvlog file into the experiment's pvlog folder, patch datetime fields, and return the destination path."""
+        try:
+            stripped = pvlog_path.removeprefix("/home/gse_admin")
+            source_file = Path(stripped) if stripped.startswith("/") else Path(pvlog_path)
+
+            if not source_file.exists():
+                self._logger.warning(f"pvlog file not found: {source_file}")
+                return None
+
+            dest_file = pvlog_folder / "pvlog.yaml"
+
+            if self.dry_run:
+                self._logger.info(f"[DRY-RUN] Would copy pvlog file: {source_file} -> {dest_file}")
+            else:
+                pvlog_folder.mkdir(parents=True, exist_ok=True)
+                if not dest_file.exists():
+                    shutil.copy2(source_file, dest_file)
+                    self._logger.info(f"Copied pvlog file: {source_file.name} -> {dest_file}")
+                else:
+                    self._logger.info(f"pvlog file already exists, skipping: {dest_file.name}")
+
+                self._patch_pvlog_dates(dest_file, start_date, end_date)
+
+            return str(dest_file)
+
+        except Exception as e:
+            self._logger.warning(f"Failed to copy pvlog file {pvlog_path}: {e}")
+            return None
+
+    def _patch_pvlog_dates(self, pvlog_file: Path, start_date=None, end_date=None) -> None:
+        """Modify or insert start_datetime and end_datetime in a pvlog YAML file."""
+        try:
+            with open(pvlog_file, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            def fmt(dt):
+                return f"'{dt.strftime('%Y-%m-%d %H:%M:%S')}'"
+
+            for key, value in [("start_datetime", start_date), ("end_datetime", end_date)]:
+                if value is None:
+                    continue
+                formatted = fmt(value)
+                pattern = re.compile(rf"^({key}\s*:).*$", re.MULTILINE)
+                if pattern.search(content):
+                    content = pattern.sub(rf"\1 {formatted}", content)
+                else:
+                    content = content.rstrip("\n") + f"\n{key}: {formatted}\n"
+
+            with open(pvlog_file, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            self._logger.info(f"Patched datetime fields in: {pvlog_file.name}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed to patch pvlog datetime fields in {pvlog_file}: {e}")
 
     def create_doi_public_folder(self, experiment_id: int, year: int, user_base_path: str, public_base_path: Optional[Path] = None) -> Path:
         """Create the public DOI folder structure matching the DOI URL path."""

@@ -54,6 +54,7 @@ def get_next_queue_item(db_manager) -> Optional[dict]:
                 "id": queue_item.id,
                 "experiment_id": queue_item.experiment_id,
                 "data_path": queue_item.data_path,
+                "pvlog_path": queue_item.pvlog_path,
                 "acknowledgments": queue_item.acknowledgments,
                 "draft_doi": queue_item.draft_doi,
                 "create_doi": queue_item.create_doi,
@@ -154,6 +155,36 @@ def get_experiment_run_name(db_manager, experiment_id: int) -> Optional[str]:
             return result.run.name if result and result.run else None
         except Exception as e:
             raise DBException(f"Error getting run name for experiment {experiment_id}: {e}")
+
+
+def get_experiment_dois(db_manager, experiment_id: int) -> dict:
+    """Get sees_doi and aps_doi for an experiment."""
+    with db_manager.get_session() as session:
+        try:
+            experiment = session.get(ExperimentItem, experiment_id)
+            if not experiment:
+                return {}
+            return {
+                "sees_doi": experiment.sees_doi,
+                "aps_doi": experiment.aps_doi,
+            }
+        except Exception as e:
+            raise DBException(f"Error getting DOIs for experiment {experiment_id}: {e}")
+
+
+def get_experiment_dates(db_manager, experiment_id: int) -> dict:
+    """Get start_date and end_date for an experiment."""
+    with db_manager.get_session() as session:
+        try:
+            experiment = session.get(ExperimentItem, experiment_id)
+            if not experiment:
+                return {}
+            return {
+                "start_date": experiment.start_date,
+                "end_date": experiment.end_date,
+            }
+        except Exception as e:
+            raise DBException(f"Error getting dates for experiment {experiment_id}: {e}")
 
 
 def update_experiment(db_manager, experiment_id: int, **kwargs) -> bool:

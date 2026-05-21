@@ -44,6 +44,9 @@ class QueueProcessor:
         if queue_item.create_doi:
             self._doi_processor.process_doi(queue_item)
 
+        # Write DOI info file after DOI minting so sees_doi is populated
+        self._folder_processor.write_doi_info_file(queue_item)
+
     def process_next(self) -> bool:
         """Process the next queue item."""
         try:

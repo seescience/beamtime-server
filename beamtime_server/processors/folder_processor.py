@@ -104,6 +104,11 @@ class FolderProcessor:
             # Copy ESAF file
             self._copy_esaf_file(queue_item, base_path, folder_path)
 
+            # Copy pvlog file if provided
+            pvlog_path = getattr(queue_item, "pvlog_path", None)
+            if pvlog_path:
+                self._copy_pvlog_file(queue_item, base_path, folder_path, pvlog_path)
+
             return True
 
         except Exception as e:
@@ -152,3 +157,66 @@ class FolderProcessor:
 
         except Exception as e:
             self._logger.warning(f"Failed to process ESAF file: {e}")
+
+    def _copy_pvlog_file(self, queue_item, base_path: str, folder_path: str, pvlog_path: str) -> None:
+        """Copy pvlog file into the experiment's pvlog subfolder and update experiment record."""
+        try:
+            folder_path_str = str(folder_path).lstrip("/")
+            pvlog_folder = Path(base_path) / folder_path_str / "pvlog"
+
+            dates = crud.get_experiment_dates(self._db_manager, queue_item.experiment_id)
+            dest_path = self._data_service.copy_pvlog_file(
+                pvlog_path=pvlog_path,
+                pvlog_folder=pvlog_folder,
+                start_date=dates.get("start_date"),
+                end_date=dates.get("end_date"),
+            )
+
+            if dest_path:
+                normalized = self._normalize_pvlog_path(dest_path)
+                crud.update_experiment(self._db_manager, queue_item.experiment_id, pvlog_file=normalized)
+                self._logger.info(f"Updated experiment {queue_item.experiment_id} with pvlog path: {normalized}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed to copy pvlog file for experiment {queue_item.experiment_id}: {e}")
+
+    def write_doi_info_file(self, queue_item) -> None:
+        """Write any existing DOIs to a DOIs.txt file in the experiment's info folder."""
+        try:
+            dois = crud.get_experiment_dois(self._db_manager, queue_item.experiment_id)
+            sections = []
+            if dois.get("sees_doi"):
+                sections.append(f"SEES DOI\n\n{dois['sees_doi']}")
+            if dois.get("aps_doi"):
+                sections.append(f"APS DOI\n\n{dois['aps_doi']}")
+
+            if not sections:
+                return
+
+            base_path = crud.get_info_value(self._db_manager, "base_path")
+            folder_path_str = str(queue_item.data_path).lstrip("/")
+            info_folder = Path(base_path) / folder_path_str / "info"
+            doi_file = info_folder / "DOIs.txt"
+
+            if doi_file.exists():
+                self._logger.info(f"DOIs.txt already exists, skipping: {doi_file}")
+                return
+
+            separator = "\n\n" + ("-" * 80) + "\n\n"
+            content = separator.join(sections) + "\n"
+
+            info_folder.mkdir(parents=True, exist_ok=True)
+            doi_file.write_text(content, encoding="utf-8")
+            self._logger.info(f"Wrote {len(sections)} DOI(s) to: {doi_file}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed to write DOIs.txt for experiment {queue_item.experiment_id}: {e}")
+
+    @staticmethod
+    def _normalize_pvlog_path(path: str) -> str:
+        """Strip any /home/... prefix and rewrite to /cars4 or /cars6 based on the real path."""
+        import re
+        normalized = re.sub(r"^/home/[^/]+", "", path)
+        if not normalized.startswith("/"):
+            normalized = "/" + normalized
+        return normalized
