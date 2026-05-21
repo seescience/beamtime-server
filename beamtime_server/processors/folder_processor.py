@@ -163,7 +163,14 @@ class FolderProcessor:
         try:
             folder_path_str = str(folder_path).lstrip("/")
             pvlog_folder = Path(base_path) / folder_path_str / "pvlog"
-            dest_path = self._data_service.copy_pvlog_file(pvlog_path=pvlog_path, pvlog_folder=pvlog_folder)
+
+            dates = crud.get_experiment_dates(self._db_manager, queue_item.experiment_id)
+            dest_path = self._data_service.copy_pvlog_file(
+                pvlog_path=pvlog_path,
+                pvlog_folder=pvlog_folder,
+                start_date=dates.get("start_date"),
+                end_date=dates.get("end_date"),
+            )
 
             if dest_path:
                 normalized = self._normalize_pvlog_path(dest_path)

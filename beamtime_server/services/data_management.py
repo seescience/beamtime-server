@@ -12,6 +12,7 @@
 # ----------------------------------------------------------------------------------
 
 import glob
+import re
 import shutil
 from dataclasses import dataclass, field
 from logging import Logger
@@ -197,8 +198,8 @@ class DataManagementService:
             self._logger.warning(f"Failed to copy ESAF file for experiment {experiment_id}: {e}")
             return None
 
-    def copy_pvlog_file(self, pvlog_path: str, pvlog_folder: Path) -> Optional[str]:
-        """Copy pvlog file into the experiment's pvlog folder and return the normalized destination path."""
+    def copy_pvlog_file(self, pvlog_path: str, pvlog_folder: Path, start_date=None, end_date=None) -> Optional[str]:
+        """Copy pvlog file into the experiment's pvlog folder, patch datetime fields, and return the destination path."""
         try:
             stripped = pvlog_path.removeprefix("/home/gse_admin")
             source_file = Path(stripped) if stripped.startswith("/") else Path(pvlog_path)
@@ -219,11 +220,40 @@ class DataManagementService:
                 else:
                     self._logger.info(f"pvlog file already exists, skipping: {dest_file.name}")
 
+                self._patch_pvlog_dates(dest_file, start_date, end_date)
+
             return str(dest_file)
 
         except Exception as e:
             self._logger.warning(f"Failed to copy pvlog file {pvlog_path}: {e}")
             return None
+
+    def _patch_pvlog_dates(self, pvlog_file: Path, start_date=None, end_date=None) -> None:
+        """Modify or insert start_datetime and end_datetime in a pvlog YAML file."""
+        try:
+            with open(pvlog_file, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            def fmt(dt):
+                return f"'{dt.strftime('%Y-%m-%d %H:%M:%S')}'"
+
+            for key, value in [("start_datetime", start_date), ("end_datetime", end_date)]:
+                if value is None:
+                    continue
+                formatted = fmt(value)
+                pattern = re.compile(rf"^({key}\s*:).*$", re.MULTILINE)
+                if pattern.search(content):
+                    content = pattern.sub(rf"\1 {formatted}", content)
+                else:
+                    content = content.rstrip("\n") + f"\n{key}: {formatted}\n"
+
+            with open(pvlog_file, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            self._logger.info(f"Patched datetime fields in: {pvlog_file.name}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed to patch pvlog datetime fields in {pvlog_file}: {e}")
 
     def create_doi_public_folder(self, experiment_id: int, year: int, user_base_path: str, public_base_path: Optional[Path] = None) -> Path:
         """Create the public DOI folder structure matching the DOI URL path."""

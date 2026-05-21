@@ -157,6 +157,21 @@ def get_experiment_run_name(db_manager, experiment_id: int) -> Optional[str]:
             raise DBException(f"Error getting run name for experiment {experiment_id}: {e}")
 
 
+def get_experiment_dates(db_manager, experiment_id: int) -> dict:
+    """Get start_date and end_date for an experiment."""
+    with db_manager.get_session() as session:
+        try:
+            experiment = session.get(ExperimentItem, experiment_id)
+            if not experiment:
+                return {}
+            return {
+                "start_date": experiment.start_date,
+                "end_date": experiment.end_date,
+            }
+        except Exception as e:
+            raise DBException(f"Error getting dates for experiment {experiment_id}: {e}")
+
+
 def update_experiment(db_manager, experiment_id: int, **kwargs) -> bool:
     """Update experiment by ID with provided keyword arguments."""
     with db_manager.get_session() as session:
