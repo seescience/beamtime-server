@@ -72,7 +72,13 @@ class DOIMetadataBuilder:
             types={"resourceType": "Dataset", "resourceTypeGeneral": "Dataset"},
             language="en",
             version="0.1",
-            dates=[{"date": experiment.start_date.isoformat() if experiment.start_date else None, "dateType": "Issued"}],
+            dates=[
+                d for d in [
+                    {"date": experiment.start_date.isoformat(), "dateType": "Collected", "dateInformation": "Start date"} if experiment.start_date else None,
+                    {"date": experiment.end_date.isoformat(), "dateType": "Collected", "dateInformation": "End date"} if experiment.end_date else None,
+                    {"date": experiment.start_date.isoformat(), "dateType": "Issued"} if experiment.start_date else None,
+                ] if d is not None
+            ],
             rights_list=[
                 {
                     "rights": "Creative Commons Attribution 4.0 International",
