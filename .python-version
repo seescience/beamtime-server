@@ -2,7 +2,7 @@
 # Project: Beamtime-Server
 # File: .python-version
 # ----------------------------------------------------------------------------------
-# Purpose: 
+# Purpose:
 # This file is used to keep track of the python version of the project.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
@@ -11,4 +11,4 @@
 # Copyright (c) 2025 GSECARS, The University of Chicago, USA
 # ----------------------------------------------------------------------------------
 
-3.13
+3.14
