@@ -1,15 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: beamtime_server/utils/logger.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Centralized logging with rotating compressed log files.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import gzip
 import logging

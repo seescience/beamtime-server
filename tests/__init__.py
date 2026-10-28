@@ -1,15 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: tests/__init__.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# This module is used to run all tests in the tests directory.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import sys
 from pathlib import Path

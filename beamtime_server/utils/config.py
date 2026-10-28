@@ -1,15 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: beamtime_server/utils/config.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# This module defines configuration classes for the Beamtime Server application.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import os
 from dataclasses import dataclass, field

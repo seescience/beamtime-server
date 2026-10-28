@@ -1,19 +1,5 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: beamtime_server/processors/doi_processor.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# This file contains the DOIProcessor class, responsible for handling DOI-related
-# operations. It works closely with the data service and DOI service to create,
-# update, and publish DOIs for experiments. The processor builds DOI metadata
-# schemas using relationships and ensures that the DOI information is correctly
-# reflected in the experiment records and public data folders.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
+
 from datetime import datetime
 
 from sqlalchemy import select
@@ -73,11 +59,13 @@ class DOIMetadataBuilder:
             language="en",
             version="0.1",
             dates=[
-                d for d in [
+                d
+                for d in [
                     {"date": experiment.start_date.isoformat(), "dateType": "Collected", "dateInformation": "Start date"} if experiment.start_date else None,
                     {"date": experiment.end_date.isoformat(), "dateType": "Collected", "dateInformation": "End date"} if experiment.end_date else None,
                     {"date": experiment.start_date.isoformat(), "dateType": "Issued"} if experiment.start_date else None,
-                ] if d is not None
+                ]
+                if d is not None
             ],
             rights_list=[
                 {

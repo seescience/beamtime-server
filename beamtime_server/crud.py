@@ -1,15 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: beamtime_server/crud.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Direct CRUD operations for the beamtime server, used by the queue processor.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from typing import Optional
 

@@ -1,15 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: beamtime_server/services/doi.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# This module provides a class for creating, updating, publishing and deleting DOIs.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from dataclasses import dataclass, field
 from logging import Logger

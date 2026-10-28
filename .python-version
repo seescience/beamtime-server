@@ -1,14 +1,3 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: .python-version
-# ----------------------------------------------------------------------------------
-# Purpose:
-# This file is used to keep track of the python version of the project.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 NSF SEES, USA
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 3.14

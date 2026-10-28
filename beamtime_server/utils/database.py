@@ -1,15 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: beamtime_server/utils/database.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# PostgreSQL database connection and session management using proper DatabaseManager.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field

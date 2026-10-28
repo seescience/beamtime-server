@@ -1,16 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: beamtime_server/processors/folder_processor.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Dedicated processor for handling all folder-related operations. It provides folder
-# processing capabilities.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from pathlib import Path
 from typing import Optional
@@ -216,6 +204,7 @@ class FolderProcessor:
     def _normalize_pvlog_path(path: str) -> str:
         """Strip any /home/... prefix and rewrite to /cars4 or /cars6 based on the real path."""
         import re
+
         normalized = re.sub(r"^/home/[^/]+", "", path)
         if not normalized.startswith("/"):
             normalized = "/" + normalized

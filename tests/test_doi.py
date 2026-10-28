@@ -1,15 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Beamtime-Server
-# File: test_doi.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# This module provides tests for the DOI service functionality.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2025 GSECARS, The University of Chicago, USA
-# Copyright (c) 2025 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import logging
 import os
@@ -43,7 +32,7 @@ class TestDOIService:
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
             return DOIService(logger=mock_logger, config=config)
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
     @pytest.fixture
@@ -69,7 +58,7 @@ class TestDOIService:
             assert service.config.password == config.password
             assert service.config.base_url == config.base_url
             assert service.config.prefix == config.prefix
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
     def test_doi_service_initialization_missing_base_url(self, mock_logger):
@@ -106,7 +95,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         test_doi_id = f"{config.prefix}/test-doi-123"
@@ -148,7 +137,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         mock_session = MagicMock()
@@ -169,7 +158,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         mock_session = MagicMock()
@@ -187,7 +176,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         test_doi_id = f"{config.prefix}/test-doi-123"
@@ -229,7 +218,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         test_doi_id = f"{config.prefix}/test-doi-123"
@@ -252,7 +241,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         test_doi_id = f"{config.prefix}/test-doi-123"
@@ -272,7 +261,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         test_doi_id = f"{config.prefix}/test-doi-123"
@@ -307,7 +296,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         test_doi_id = f"{config.prefix}/test-doi-123"
@@ -330,7 +319,7 @@ class TestDOIService:
             config = DOIConfig()
             if not all([config.base_url, config.username, config.password, config.prefix]):
                 pytest.skip("DOI environment variables not configured")
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             pytest.skip("DOI configuration not available")
 
         test_doi_id = f"{config.prefix}/test-doi-123"
